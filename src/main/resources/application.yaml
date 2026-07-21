@@ -18,9 +18,6 @@ spring:
   sql:
     init:
       mode: always            # data.sql 실행(개발 시드)
-  jackson:
-    serialization:
-      write-dates-as-timestamps: false   # 날짜를 ISO 문자열로
 
 server:
   port: 8080

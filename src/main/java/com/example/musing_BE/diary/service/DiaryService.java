@@ -67,8 +67,9 @@ public class DiaryService {
         Diary diary = diaryRepository.findByUserIdAndDiaryDate(DEV_USER_ID, date)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DIARY_NOT_FOUND));
         diary.update(req.title(), req.body(), req.mood(), req.weather());
-        diary.clearTracks();       // 기존 곡 연결 제거(orphanRemoval)
-        attachTracks(diary, req);  // 새로 설정
+        diary.clearTracks();          // 기존 곡 연결 제거(orphanRemoval)
+        diaryRepository.flush();      // DELETE를 INSERT보다 먼저 실행 → uq_diary_role 충돌 방지
+        attachTracks(diary, req);     // 새로 설정
         return DiaryDetailResponse.from(diary);
     }
 
