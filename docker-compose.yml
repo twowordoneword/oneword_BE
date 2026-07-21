@@ -1,0 +1,26 @@
+# 로컬 개발용 MySQL. 이미 MariaDB가 깔려 있으면 이걸 안 띄우고 로컬 MariaDB를 그대로 써도 됩니다.
+# (MariaDB는 MySQL 드롭인 호환 — Spring은 MySQL 다이얼렉트 그대로 동작)
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: musing-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: musing
+      MYSQL_USER: musing
+      MYSQL_PASSWORD: musing
+      TZ: Asia/Seoul
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - musing-mysql-data:/var/lib/mysql
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  musing-mysql-data:

@@ -1,0 +1,60 @@
+erDiagram
+    USER ||--o{ DIARY : writes
+    USER ||--o{ REFRESH_TOKEN : has
+    DIARY ||--o{ DIARY_TRACK : has
+    TRACK ||--o{ DIARY_TRACK : referenced_by
+
+    USER {
+        bigint      id PK "AUTO_INCREMENT"
+        varchar     email "NOT NULL, UNIQUE"
+        varchar     nickname "NOT NULL"
+        varchar     provider "kakao|naver|google|apple"
+        varchar     provider_id "소셜 고유 ID, nullable"
+        datetime    created_at
+        datetime    updated_at
+    }
+
+    DIARY {
+        bigint      id PK "AUTO_INCREMENT"
+        bigint      user_id FK "-> USER.id"
+        date        diary_date "일기 날짜, NOT NULL"
+        varchar     title "제목"
+        text        body "본문"
+        varchar     mood "기쁨|우울|슬픔|화남|평온|보통|답답|모름"
+        varchar     weather "맑음|흐림|비|눈|바람"
+        datetime    created_at
+        datetime    updated_at
+    }
+
+    TRACK {
+        bigint      id PK "AUTO_INCREMENT"
+        varchar     name "곡명, NOT NULL"
+        varchar     artist "가수, NOT NULL"
+        varchar     isrc "국제표준녹음코드, UNIQUE, nullable"
+        varchar     album "nullable"
+        varchar     artwork_url "iTunes 600x600, nullable"
+        varchar     preview_url "30초 미리듣기, nullable"
+        decimal     valence "감정특성 캐시, nullable"
+        decimal     energy "arousal 근사, nullable"
+        decimal     acousticness "nullable"
+        decimal     tempo "BPM, nullable"
+        varchar     features_source "reccobeats|essentia, nullable"
+        datetime    features_fetched_at "nullable"
+        datetime    created_at
+    }
+
+    DIARY_TRACK {
+        bigint      id PK "AUTO_INCREMENT"
+        bigint      diary_id FK "-> DIARY.id"
+        bigint      track_id FK "-> TRACK.id"
+        varchar     role "MY | RECOMMENDED"
+        datetime    created_at
+    }
+
+    REFRESH_TOKEN {
+        bigint      id PK "AUTO_INCREMENT"
+        bigint      user_id FK "-> USER.id"
+        varchar     token_hash "UNIQUE, 해시 저장"
+        datetime    expires_at "만료 시각"
+        datetime    created_at
+    }

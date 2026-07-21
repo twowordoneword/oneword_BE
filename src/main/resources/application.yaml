@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: musing_BE
+  datasource:
+    url: jdbc:mysql://localhost:3306/musing?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: musing          # 로컬 MariaDB면 root 등으로 변경
+    password: musing
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update        # 첫 슬라이스 편의상 update. 안정화 후 schema.sql + validate 권장
+    defer-datasource-initialization: true   # data.sql 시드가 스키마 생성 뒤 실행되도록
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+    show-sql: true
+  sql:
+    init:
+      mode: always            # data.sql 실행(개발 시드)
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false   # 날짜를 ISO 문자열로
+
+server:
+  port: 8080
+  servlet:
+    context-path: /

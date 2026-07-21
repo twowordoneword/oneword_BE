@@ -1,0 +1,67 @@
+<svg viewBox="0 0 780 600" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, -apple-system, 'Malgun Gothic', sans-serif">
+<rect x="0" y="0" width="780" height="600" fill="#FCF9F2"/>
+<style>
+.tbl-title{font-size:13px;font-weight:700;fill:#2a2a2a}
+.col{font-size:11px;fill:#555}
+.pk{font-size:11px;font-weight:700;fill:#c0392b}
+.hdr{fill:#f6ded9}
+.box{fill:#ffffff;stroke:#d9d4cb;stroke-width:1.5}
+.rel{stroke:#999;stroke-width:1.5;fill:none}
+.rlabel{font-size:10px;fill:#777;font-weight:600}
+.ex{font-size:10px;fill:#c0392b;font-style:italic}
+.note{font-size:10px;fill:#999}
+</style>
+<text x="30" y="26" font-size="16" font-weight="700" fill="#EE6C5A">뮤징(musing) — ERD</text>
+
+<rect class="box hdr" x="30" y="45" width="180" height="26" rx="6"/>
+<rect class="box" x="30" y="71" width="180" height="80"/>
+<text class="tbl-title" x="42" y="63">USERS</text>
+<text class="pk"  x="42" y="91">id (PK)</text>
+<text class="col" x="42" y="109">email  ·UNIQUE</text>
+<text class="col" x="42" y="125">nickname</text>
+<text class="col" x="42" y="141">provider / provider_id</text>
+<text class="ex"  x="42" y="165">ex) 1 · 예성 · kakao</text>
+
+<rect class="box hdr" x="300" y="45" width="180" height="26" rx="6"/>
+<rect class="box" x="300" y="71" width="180" height="112"/>
+<text class="tbl-title" x="312" y="63">DIARIES</text>
+<text class="pk"  x="312" y="91">id (PK)</text>
+<text class="col" x="312" y="109">user_id (FK)</text>
+<text class="col" x="312" y="125">diary_date</text>
+<text class="col" x="312" y="141">title / body</text>
+<text class="col" x="312" y="157">mood  ·8종</text>
+<text class="col" x="312" y="173">weather  ·5종</text>
+<text class="ex"  x="312" y="201">ex) 101 · 08-02 · 평온</text>
+<text class="note" x="300" y="219">UNIQUE(user_id, diary_date) → 하루 1개</text>
+
+<rect class="box hdr" x="570" y="45" width="180" height="26" rx="6"/>
+<rect class="box" x="570" y="71" width="180" height="168"/>
+<text class="tbl-title" x="582" y="63">TRACKS</text>
+<text class="pk"  x="582" y="91">id (PK)</text>
+<text class="col" x="582" y="109">name · artist · isrc</text>
+<text class="col" x="582" y="125">album</text>
+<text class="col" x="582" y="141">artwork_url / preview_url</text>
+<text class="col" x="582" y="161">valence · energy</text>
+<text class="col" x="582" y="177">acousticness · tempo</text>
+<text class="col" x="582" y="193">features_source / _at</text>
+<text class="note" x="570" y="213">↑ 감정특성 캐시(ReccoBeats/</text>
+<text class="note" x="570" y="227">   Essentia 자체분석)</text>
+<text class="ex"  x="582" y="253">ex) 12 · 밤편지 · 아이유</text>
+
+<rect class="box hdr" x="300" y="425" width="180" height="26" rx="6"/>
+<rect class="box" x="300" y="451" width="180" height="86"/>
+<text class="tbl-title" x="312" y="443">DIARY_TRACKS</text>
+<text class="pk"  x="312" y="471">id (PK)</text>
+<text class="col" x="312" y="489">diary_id (FK)</text>
+<text class="col" x="312" y="505">track_id (FK)</text>
+<text class="col" x="312" y="521">role  ·MY / RECOMMENDED</text>
+<text class="note" x="300" y="557">UNIQUE(diary_id, role) → MY 1 · REC 1</text>
+<text class="ex" x="300" y="573">ex) (101, 12, MY) · (101, 33, RECOMMENDED)</text>
+
+<path class="rel" d="M210,118 H300"/>
+<text class="rlabel" x="243" y="112">1 : N</text>
+<path class="rel" d="M390,183 V425"/>
+<text class="rlabel" x="396" y="310">1 : N</text>
+<path class="rel" d="M660,239 V494 H480"/>
+<text class="rlabel" x="600" y="485">1 : N</text>
+</svg>
