@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:            # 모든 PR에서 실행
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # 테스트용 MySQL을 잠깐 띄움 (@SpringBootTest가 실제 DB 연결 필요)
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: musing
+          MYSQL_USER: musing
+          MYSQL_PASSWORD: musing
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle          # 의존성 캐싱 (빌드 빨라짐)
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build & Test
+        run: ./gradlew build
+        env:
+          DB_URL: jdbc:mysql://localhost:3306/musing?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+          DB_USERNAME: musing
+          DB_PASSWORD: musing
