@@ -2,13 +2,14 @@ spring:
   application:
     name: musing_BE
   datasource:
-    url: jdbc:mysql://localhost:3306/musing?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: musing          # 로컬 MariaDB면 root 등으로 변경
-    password: musing
+    # 계정은 환경변수로 주입(없으면 로컬 기본값). 배포 시 실제 값은 env로만 전달 — 커밋 금지.
+    url: ${DB_URL:jdbc:mysql://localhost:3306/musing?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    username: ${DB_USERNAME:musing}
+    password: ${DB_PASSWORD:musing}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: update        # 첫 슬라이스 편의상 update. 안정화 후 schema.sql + validate 권장
+      ddl-auto: ${JPA_DDL_AUTO:update}   # 로컬 update. ⚠️ 배포 시 validate(+schema.sql)로 변경
     defer-datasource-initialization: true   # data.sql 시드가 스키마 생성 뒤 실행되도록
     properties:
       hibernate:
