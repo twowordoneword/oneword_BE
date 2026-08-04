@@ -38,7 +38,7 @@ public class DiaryService {
 
     /** 월별 기록 조회 (캘린더). month = "YYYY-MM" */
     public MonthlyDiaryResponse getMonthly(String month) {
-        YearMonth ym = YearMonth.parse(month); // 형식 오류 시 IllegalArgumentException -> 400
+        YearMonth ym = YearMonth.parse(month); // 형식 오류 시 DateTimeParseException -> 400
         List<Diary> diaries = diaryRepository.findMonthlyWithTracks(
                 DEV_USER_ID, ym.atDay(1), ym.atEndOfMonth());
         return MonthlyDiaryResponse.of(month, diaries);

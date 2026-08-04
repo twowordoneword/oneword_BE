@@ -19,6 +19,8 @@ public record MonthlyDiaryResponse(
             Mood mood
     ) {
         public static DayItem from(Diary d) {
+            // hasMusic(음악 등록 여부)은 '나의 음악(MY)' 기준.
+            // 커버는 캘린더를 풍성하게: MY 우선, 없으면 추천곡(RECOMMENDED)이라도 표시.
             Track cover = d.getMyTrack() != null ? d.getMyTrack() : d.getTodayTrack();
             String url = cover != null ? cover.getArtworkUrl() : null;
             return new DayItem(d.getDiaryDate(), true, d.hasMusic(), url, d.getMood());
