@@ -54,6 +54,13 @@ public class Track {
     @PrePersist
     void onCreate() { this.createdAt = LocalDateTime.now(); }
 
+    /** 기존 곡 재사용 시 메타 갱신(전달된 값이 있을 때만). */
+    public void updateMeta(String album, String artworkUrl, String previewUrl) {
+        if (album != null) this.album = album;
+        if (artworkUrl != null) this.artworkUrl = artworkUrl;
+        if (previewUrl != null) this.previewUrl = previewUrl;
+    }
+
     @Builder
     private Track(String name, String artist, String isrc, String album, String artworkUrl, String previewUrl) {
         this.name = name;

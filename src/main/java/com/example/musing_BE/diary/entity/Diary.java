@@ -97,5 +97,6 @@ public class Diary {
 
     public Track getMyTrack() { return findTrackByRole(TrackRole.MY); }
     public Track getTodayTrack() { return findTrackByRole(TrackRole.RECOMMENDED); }
-    public boolean hasMusic() { return !diaryTracks.isEmpty(); }
+    /** '음악 기록' 여부 = 사용자가 직접 고른 곡(MY)이 있는지. 추천곡(RECOMMENDED)은 제외. */
+    public boolean hasMusic() { return getMyTrack() != null; }
 }
