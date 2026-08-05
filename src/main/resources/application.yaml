@@ -24,3 +24,31 @@ server:
   port: 8080
   servlet:
     context-path: /
+
+# ----- 뮤징 추천/수집 설정 (RECOMMENDATION_STAGE2 §7) -----
+musing:
+  chart:
+    enabled: false            # 자동 실행 스위치. 설문 수집을 먼저 하므로 꺼 둠(수동 트리거는 가능)
+    storefronts: kr,us        # 후보 풀 수집 대상. kr만 쓰려면 'kr'
+    limit: 100                # Apple RSS 상한(200은 빈 응답)
+    songs-per-artist: 50      # 아티스트당 카탈로그 곡 수 — 풀 크기·소요 시간 조절
+    request-delay-ms: 3000    # iTunes 분당 20콜 제한 대응
+    cron: "0 0 3 * * MON"     # 매주 월요일 03:00 (Asia/Seoul)
+  freqblog:
+    # 키는 커밋 금지 — 환경변수로만 주입.  FREQBLOG_API_KEY=sk_live_... ./gradlew bootRun
+    api-key: ${FREQBLOG_API_KEY:}
+    max-per-run: 200          # 실행당 조회 상한(무료 월 1,000건 보호)
+    request-delay-ms: 200     # 동시 6건 제한이 있어 순차 호출
+  recommendation:
+    # 곡 선택 점수 (§5.1) — 모두 검증 전 시작값. 실제 청취·설문으로 튜닝할 것.
+    weight-valence: 1.0         # 밝기 거리 가중
+    weight-arousal: 1.0         # 활기 거리 가중
+    weight-acoustic-rain: 0.5   # 비 오는 날 어쿠스틱 가중
+    bonus-same-artist: 0.15     # seed와 같은 가수 우대
+    bonus-same-genre: 0.05      # seed와 같은 장르 우대
+    bonus-korean: 0.03          # 한국 곡 우대(동점 처리용). 0.12는 감정 매칭을 압도해 낮춤
+    top-k: 30                   # 상위 30곡 중 고정 시드로 선택(다양성)
+    exclude-recent-days: 14     # 최근 추천 곡 제외 기간
+  admin:
+    # 배치 수동 트리거용 공유 토큰. 비어 있으면 트리거가 항상 401.
+    token: ${ADMIN_TOKEN:}
