@@ -141,6 +141,61 @@ class SurveyCollectServiceTest {
     }
 
     @Test
+    @DisplayName("곡명이 있으면 곡으로 가수를 특정한다 (동명이인 방지)")
+    void resolvesArtistBySongWhenTrackGiven() {
+        given(itunesClient.findArtistBySong(eq("김광석 서른 즈음에"), anyString()))
+                .willReturn(Optional.of(new ItunesClient.ItunesArtist(200L, "김광석", "포크")));
+        given(itunesClient.lookupArtistSongs(anyLong(), anyInt(), anyString())).willReturn(List.of());
+
+        service.collect(List.of("김광석 - 서른 즈음에"), "kr", 10);
+
+        verify(itunesClient).findArtistBySong(eq("김광석 서른 즈음에"), anyString());
+        verify(itunesClient, never()).searchArtist(anyString(), anyString());   // 이름 검색은 안 탄다
+        verify(itunesClient).lookupArtistSongs(eq(200L), anyInt(), anyString());
+    }
+
+    @Test
+    @DisplayName("곡으로 못 찾으면 가수 이름 검색으로 폴백한다")
+    void fallsBackToArtistSearch() {
+        given(itunesClient.findArtistBySong(anyString(), anyString())).willReturn(Optional.empty());
+        given(itunesClient.searchArtist(eq("김광석"), anyString()))
+                .willReturn(Optional.of(new ItunesClient.ItunesArtist(300L, "김광석", "포크")));
+        given(itunesClient.lookupArtistSongs(anyLong(), anyInt(), anyString())).willReturn(List.of());
+
+        service.collect(List.of("김광석 - 없는곡"), "kr", 10);
+
+        verify(itunesClient).findArtistBySong(anyString(), anyString());
+        verify(itunesClient).searchArtist(eq("김광석"), anyString());
+        verify(itunesClient).lookupArtistSongs(eq(300L), anyInt(), anyString());
+    }
+
+    @Test
+    @DisplayName("곡이 달라도 같은 가수면 카탈로그를 한 번만 받는다")
+    void doesNotRefetchSameArtist() {
+        given(itunesClient.findArtistBySong(anyString(), anyString()))
+                .willReturn(Optional.of(new ItunesClient.ItunesArtist(400L, "아이유", "K-Pop")));
+        given(itunesClient.lookupArtistSongs(anyLong(), anyInt(), anyString())).willReturn(List.of());
+
+        service.collect(List.of("아이유 - 밤편지", "아이유 - 좋은 날", "아이유 - 삐삐"), "kr", 10);
+
+        verify(itunesClient, times(3)).findArtistBySong(anyString(), anyString());   // 응답마다 조회는 하되
+        verify(itunesClient, times(1)).lookupArtistSongs(eq(400L), anyInt(), anyString()); // 카탈로그는 한 번만
+    }
+
+    @Test
+    @DisplayName("가수 이름만 있으면 곡 검색을 건너뛴다")
+    void skipsSongSearchWhenNoTrack() {
+        given(itunesClient.searchArtist(anyString(), anyString()))
+                .willReturn(Optional.of(new ItunesClient.ItunesArtist(500L, "넬", "Rock")));
+        given(itunesClient.lookupArtistSongs(anyLong(), anyInt(), anyString())).willReturn(List.of());
+
+        service.collect(List.of("넬"), "kr", 10);
+
+        verify(itunesClient, never()).findArtistBySong(anyString(), anyString());
+        verify(itunesClient).searchArtist(eq("넬"), anyString());
+    }
+
+    @Test
     @DisplayName("songsPerArtist가 없으면 설정 기본값을 쓴다")
     void usesDefaultSongsPerArtist() {
         given(itunesClient.searchArtist(anyString(), anyString()))

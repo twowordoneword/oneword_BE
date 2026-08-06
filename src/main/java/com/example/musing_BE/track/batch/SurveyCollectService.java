@@ -1,6 +1,8 @@
 package com.example.musing_BE.track.batch;
 
 import com.example.musing_BE.track.client.ItunesClient;
+import com.example.musing_BE.track.domain.SurveyEntry;
+import com.example.musing_BE.track.domain.TrackFilter;
 import com.example.musing_BE.track.domain.TrackOrigin;
 import com.example.musing_BE.track.dto.CollectResult;
 import com.example.musing_BE.track.dto.CollectedTrack;
@@ -14,6 +16,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -24,8 +27,12 @@ import java.util.Set;
  * 앞단만 다르다.
  *
  * <pre>
- * 설문 가수 이름 → iTunes 아티스트 검색(artistId) → 카탈로그 확장 → tracks(origin=SURVEY)
+ * 설문 응답("가수 - 곡명") → 곡 검색으로 artistId 특정 → 카탈로그 확장 → tracks(origin=SURVEY)
  * </pre>
+ *
+ * <p><b>곡명으로 가수를 특정하는 이유</b> — 이름만으로 검색하면 동명이인이 잡힌다.
+ * 실측에서 "김광석"이 포크 가수가 아니라 국악 연주자로 해석됐다. 곡명이 함께 오면
+ * 그 곡을 부른 가수로 좁혀지고, 곡명이 없으면 기존 이름 검색으로 폴백한다.
  */
 @Slf4j
 @Service
@@ -42,43 +49,52 @@ public class SurveyCollectService {
     private long requestDelayMs;
 
     /**
-     * @param artistNames   설문에서 모은 가수 이름 (중복·공백 허용 — 여기서 정리한다)
-     * @param storefront    kr/us. null이면 kr
+     * @param entries        설문 응답 줄. {@code "아이유 - 밤편지"} 또는 가수 이름만.
+     *                       중복·공백 허용 — 여기서 정리한다.
+     * @param storefront     kr/us. null이면 kr
      * @param songsPerArtist 가수당 곡 수. null이면 설정값
      */
-    public CollectResult collect(List<String> artistNames, String storefront, Integer songsPerArtist) {
+    public CollectResult collect(List<String> entries, String storefront, Integer songsPerArtist) {
         Instant start = Instant.now();
         String sf = (storefront == null || storefront.isBlank()) ? "kr" : storefront.trim().toLowerCase();
         int perArtist = (songsPerArtist == null || songsPerArtist <= 0) ? defaultSongsPerArtist : songsPerArtist;
 
-        // 표기가 흔들려도(공백·대소문자) 같은 이름은 한 번만 조회
-        Set<String> names = new LinkedHashSet<>();
-        for (String n : artistNames) {
-            if (n != null && !n.isBlank()) names.add(n.trim());
+        // 같은 응답이 여러 번 들어와도 한 번만 조회 (표기 공백 정리 포함)
+        Set<String> lines = new LinkedHashSet<>();
+        for (String n : entries) {
+            if (n != null && !n.isBlank()) lines.add(n.trim());
         }
 
         List<CollectedTrack> candidates = new ArrayList<>();
-        int resolved = 0;
+        Set<Long> seenArtistIds = new LinkedHashSet<>();
         int notFound = 0;
 
-        for (String name : names) {
+        for (String line : lines) {
+            SurveyEntry entry = SurveyEntry.parse(line);
+            if (entry == null) continue;
+
             sleepBetweenCalls();
-            var artist = itunesClient.searchArtist(name, sf);
+            Optional<ItunesClient.ItunesArtist> artist = resolveArtist(entry, sf);
             if (artist.isEmpty()) {
                 notFound++;
-                log.warn("가수를 찾지 못함: {}", name);
+                log.warn("가수를 찾지 못함: {}", line);
                 continue;
             }
-            resolved++;
+            Long artistId = artist.get().artistId();
+            if (!seenArtistIds.add(artistId)) {
+                // 다른 곡을 적었어도 같은 가수면 카탈로그를 다시 받을 필요가 없다
+                log.debug("이미 수집한 가수라 건너뜀: {} ({})", artist.get().artistName(), line);
+                continue;
+            }
             sleepBetweenCalls();
-            candidates.addAll(itunesClient.lookupArtistSongs(artist.get().artistId(), perArtist, sf));
+            candidates.addAll(itunesClient.lookupArtistSongs(artistId, perArtist, sf));
         }
 
         int skipped = 0;
         int inserted = 0;
         int updated = 0;
         for (CollectedTrack c : candidates) {
-            if (!isUsable(c)) {
+            if (!TrackFilter.isUsable(c)) {
                 skipped++;
                 continue;
             }
@@ -86,18 +102,25 @@ public class SurveyCollectService {
             else updated++;
         }
 
-        CollectResult result = new CollectResult(1, resolved, candidates.size(), skipped, inserted, updated,
+        CollectResult result = new CollectResult(1, seenArtistIds.size(), candidates.size(), skipped, inserted, updated,
                 Duration.between(start, Instant.now()).toSeconds());
-        log.info("설문 수집 완료: 요청 가수 {}명 중 {}명 확인({}명 미발견), {}", names.size(), resolved, notFound, result);
+        log.info("설문 수집 완료: 응답 {}건 → 가수 {}명 확인({}건 미발견), {}",
+                lines.size(), seenArtistIds.size(), notFound, result);
         return result;
     }
 
-    /** 미리듣기가 없으면 감정값 분석도 앱 재생도 불가하므로 제외 (§3.5). */
-    private boolean isUsable(CollectedTrack c) {
-        if (c.name() == null || c.artist() == null) return false;
-        if (c.previewUrl() == null || c.previewUrl().isBlank()) return false;
-        String album = c.album() == null ? "" : c.album();
-        return !album.contains("DJ Mix");
+    /**
+     * 곡명이 있으면 곡으로 가수를 특정하고(동명이인 방지), 실패하면 이름 검색으로 폴백한다.
+     */
+    private Optional<ItunesClient.ItunesArtist> resolveArtist(SurveyEntry entry, String storefront) {
+        if (entry.hasTrack()) {
+            Optional<ItunesClient.ItunesArtist> bySong =
+                    itunesClient.findArtistBySong(entry.searchTerm(), storefront);
+            if (bySong.isPresent()) return bySong;
+            log.debug("곡으로 가수를 못 찾아 이름 검색으로 폴백: {}", entry.searchTerm());
+            sleepBetweenCalls();
+        }
+        return itunesClient.searchArtist(entry.artist(), storefront);
     }
 
     private void sleepBetweenCalls() {

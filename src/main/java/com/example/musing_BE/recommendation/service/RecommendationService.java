@@ -3,6 +3,7 @@ package com.example.musing_BE.recommendation.service;
 import com.example.musing_BE.diary.domain.Mood;
 import com.example.musing_BE.diary.domain.Weather;
 import com.example.musing_BE.recommendation.domain.DeterministicPicker;
+import com.example.musing_BE.recommendation.domain.EmotionCalibrator;
 import com.example.musing_BE.recommendation.domain.EmotionPoint;
 import com.example.musing_BE.recommendation.domain.MoodWeatherSeasonMapper;
 import com.example.musing_BE.recommendation.domain.ScoringWeights;
@@ -25,7 +26,7 @@ import java.util.Set;
  * 오늘의 곡 추천 (RECOMMENDATION_STAGE2 §5).
  *
  * <pre>
- * 1. 목표 감정 좌표 계산        (기분 + 날씨 + 계절)
+ * 1. 목표 감정 좌표 계산        (기분 + 날씨 + 계절 → 실제 분포로 보정)
  * 2. tracks에서 후보 조회        감정값 있는 곡 — 없으면 재생 가능한 곡으로 폴백
  * 3. 최근 추천 곡 제외           14일 이내
  * 4. 점수 정렬                   거리 − 취향·한국곡 가산점
@@ -44,6 +45,7 @@ public class RecommendationService {
 
     private final TrackRepository trackRepository;
     private final MoodWeatherSeasonMapper mapper;
+    private final EmotionCalibrator calibrator;
     private final TrackScorer scorer;
     private final ScoringWeights weights;
     private final DeterministicPicker picker;
@@ -51,8 +53,8 @@ public class RecommendationService {
     @Transactional(readOnly = true)
     public RecommendationResponse recommend(Mood mood, Weather weather, LocalDate date,
                                             String seedName, String seedArtist) {
-        // 1) 목표 감정 좌표
-        EmotionPoint target = mapper.target(mood, weather, date);
+        // 1) 목표 감정 좌표 — 개념 좌표를 실제 곡 분포에 맞춰 보정한다
+        EmotionPoint target = calibrator.calibrate(mapper.target(mood, weather, date));
 
         // 2) 후보 조회 — 감정값이 있으면 랭킹, 없으면(배치 전) 재생 가능한 곡에서 폴백
         List<CandidateTrack> candidates = trackRepository.findScorable();

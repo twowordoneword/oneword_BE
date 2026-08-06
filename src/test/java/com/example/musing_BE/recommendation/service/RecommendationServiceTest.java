@@ -3,6 +3,7 @@ package com.example.musing_BE.recommendation.service;
 import com.example.musing_BE.diary.domain.Mood;
 import com.example.musing_BE.diary.domain.Weather;
 import com.example.musing_BE.recommendation.domain.DeterministicPicker;
+import com.example.musing_BE.recommendation.domain.EmotionCalibrator;
 import com.example.musing_BE.recommendation.domain.MoodWeatherSeasonMapper;
 import com.example.musing_BE.recommendation.domain.ScoringWeights;
 import com.example.musing_BE.recommendation.domain.TrackScorer;
@@ -54,6 +55,7 @@ class RecommendationServiceTest {
         service = new RecommendationService(
                 trackRepository,
                 new MoodWeatherSeasonMapper(),
+                new EmotionCalibrator(),
                 new TrackScorer(weights),
                 weights,
                 new DeterministicPicker());

@@ -116,6 +116,45 @@ public class ItunesClient {
     }
 
     /**
+     * 곡으로 아티스트 특정 — <b>동명이인 방지</b>.
+     * <p>"김광석"으로 아티스트를 검색하면 포크 가수가 아니라 국악 연주자가 나올 수 있다(실측).
+     * "김광석 서른 즈음에"처럼 곡까지 넣어 검색하면 그 곡을 부른 가수로 좁혀진다.
+     *
+     * @param term "가수 곡명" 형태의 질의어
+     * @return 첫 결과의 artistId·artistName. 못 찾으면 empty (배치 경로 — 예외 대신 empty)
+     */
+    public Optional<ItunesArtist> findArtistBySong(String term, String country) {
+        if (term == null || term.isBlank()) return Optional.empty();
+        String raw;
+        try {
+            raw = restClient.get()
+                    .uri(uriBuilder -> uriBuilder.path("/search")
+                            .queryParam("term", term)
+                            .queryParam("media", "music")
+                            .queryParam("entity", "song")
+                            .queryParam("limit", 1)
+                            .queryParam("country", country)
+                            .build())
+                    .retrieve()
+                    .body(String.class);
+        } catch (Exception e) {
+            log.warn("iTunes 곡 기반 아티스트 검색 실패 (term={}): {}", term, e.getMessage());
+            return Optional.empty();
+        }
+        if (raw == null || raw.isBlank()) return Optional.empty();
+        try {
+            ItunesResult result = objectMapper.readValue(raw, ItunesResult.class);
+            if (result.results() == null || result.results().isEmpty()) return Optional.empty();
+            ItunesSong first = result.results().get(0);
+            if (first.artistId() == null) return Optional.empty();
+            return Optional.of(new ItunesArtist(first.artistId(), first.artistName(), first.primaryGenreName()));
+        } catch (Exception e) {
+            log.warn("iTunes 곡 기반 아티스트 응답 파싱 실패 (term={}): {}", term, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
      * 트랙 ID 묶음 조회 — 차트가 주지 않는 previewUrl·앨범·장르를 채운다.
      * (배치 경로 — 실패 시 빈 목록)
      */

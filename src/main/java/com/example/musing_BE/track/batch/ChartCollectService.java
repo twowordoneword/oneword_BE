@@ -2,6 +2,7 @@ package com.example.musing_BE.track.batch;
 
 import com.example.musing_BE.track.client.AppleChartClient;
 import com.example.musing_BE.track.client.ItunesClient;
+import com.example.musing_BE.track.domain.TrackFilter;
 import com.example.musing_BE.track.domain.TrackOrigin;
 import com.example.musing_BE.track.dto.CollectResult;
 import com.example.musing_BE.track.dto.CollectedTrack;
@@ -91,7 +92,7 @@ public class ChartCollectService {
         int inserted = 0;
         int updated = 0;
         for (CollectedTrack c : candidates) {
-            if (!isUsable(c)) {
+            if (!TrackFilter.isUsable(c)) {
                 skipped++;
                 continue;
             }
@@ -104,17 +105,6 @@ public class ChartCollectService {
                 java.time.Duration.between(start, Instant.now()).toSeconds());
         log.info("수집 완료: {}", result);
         return result;
-    }
-
-    /**
-     * 후보 자격 (§3.5).
-     * 미리듣기가 없으면 감정값 분석도, 앱 내 재생도 불가하므로 제외한다.
-     */
-    private boolean isUsable(CollectedTrack c) {
-        if (c.name() == null || c.artist() == null) return false;
-        if (c.previewUrl() == null || c.previewUrl().isBlank()) return false;
-        String album = c.album() == null ? "" : c.album();
-        return !album.contains("DJ Mix");
     }
 
     private void sleepBetweenCalls() {
