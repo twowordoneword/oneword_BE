@@ -59,12 +59,19 @@ class RecommendationServiceTest {
                 new TrackScorer(weights),
                 weights,
                 new DeterministicPicker());
+        ReflectionTestUtils.setField(service, "matchSeedLanguage", true);
     }
 
     private CandidateTrack scored(long id, String name, double valence, double energy) {
         return new CandidateTrack(id, name, "가수" + id, "앨범", null, "preview",
                 BigDecimal.valueOf(valence), BigDecimal.valueOf(energy),
                 null, "Pop", false);
+    }
+
+    private CandidateTrack scored(long id, String name, String artist, double valence, double energy, boolean korean) {
+        return new CandidateTrack(id, name, artist, "앨범", null, "preview",
+                BigDecimal.valueOf(valence), BigDecimal.valueOf(energy),
+                null, "Pop", korean);
     }
 
     private CandidateTrack unscored(long id, String name) {
@@ -152,6 +159,57 @@ class RecommendationServiceTest {
         RecommendationResponse res = service.recommend(Mood.CALM, Weather.WIND, DATE, null, null);
 
         assertThat(res.track().name()).isEqualTo("딱 맞는 곡");
+    }
+
+    @Test
+    @DisplayName("seed가 한국 가수면 한국 곡만 후보가 된다")
+    void koreanSeedPicksKoreanTrack() {
+        given(trackRepository.findScorable()).willReturn(List.of(
+                scored(1L, "Drake 곡", "Drake", 0.70, 0.35, false),   // 좌표가 더 가깝지만
+                scored(2L, "리도어 곡", "리도어", 0.50, 0.50, true)));   // 한국 곡이라 이쪽
+        given(trackRepository.findRecentlyRecommendedTrackIds(anyLong(), any())).willReturn(List.of());
+
+        RecommendationResponse res = service.recommend(Mood.CALM, Weather.WIND, DATE, "영원은 그렇듯", "리도어");
+
+        assertThat(res.track().artist()).isEqualTo("리도어");
+    }
+
+    @Test
+    @DisplayName("seed가 해외 가수면 해외 곡만 후보가 된다")
+    void foreignSeedPicksForeignTrack() {
+        given(trackRepository.findScorable()).willReturn(List.of(
+                scored(1L, "Drake 곡", "Drake", 0.50, 0.50, false),
+                scored(2L, "리도어 곡", "리도어", 0.70, 0.35, true)));
+        given(trackRepository.findRecentlyRecommendedTrackIds(anyLong(), any())).willReturn(List.of());
+
+        RecommendationResponse res = service.recommend(Mood.CALM, Weather.WIND, DATE, "God's Plan", "Drake");
+
+        assertThat(res.track().artist()).isEqualTo("Drake");
+    }
+
+    @Test
+    @DisplayName("같은 언어권 후보가 없으면 전체에서 고른다 (곡은 반드시 준다)")
+    void fallsBackWhenNoLanguageMatch() {
+        given(trackRepository.findScorable()).willReturn(List.of(
+                scored(1L, "Drake 곡", "Drake", 0.70, 0.35, false)));
+        given(trackRepository.findRecentlyRecommendedTrackIds(anyLong(), any())).willReturn(List.of());
+
+        RecommendationResponse res = service.recommend(Mood.CALM, Weather.WIND, DATE, "영원은 그렇듯", "리도어");
+
+        assertThat(res.track()).isNotNull();
+        assertThat(res.track().artist()).isEqualTo("Drake");
+    }
+
+    @Test
+    @DisplayName("seed가 없으면 언어를 가리지 않는다")
+    void noSeedNoLanguageFilter() {
+        given(trackRepository.findScorable()).willReturn(List.of(
+                scored(1L, "Drake 곡", "Drake", 0.70, 0.35, false)));
+        given(trackRepository.findRecentlyRecommendedTrackIds(anyLong(), any())).willReturn(List.of());
+
+        RecommendationResponse res = service.recommend(Mood.CALM, Weather.WIND, DATE, null, null);
+
+        assertThat(res.track()).isNotNull();
     }
 
     @Test

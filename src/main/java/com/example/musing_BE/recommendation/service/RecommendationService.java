@@ -10,9 +10,11 @@ import com.example.musing_BE.recommendation.domain.ScoringWeights;
 import com.example.musing_BE.recommendation.domain.TrackScorer;
 import com.example.musing_BE.recommendation.dto.CandidateTrack;
 import com.example.musing_BE.recommendation.dto.RecommendationResponse;
+import com.example.musing_BE.track.domain.KoreanText;
 import com.example.musing_BE.track.repository.TrackRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +52,10 @@ public class RecommendationService {
     private final ScoringWeights weights;
     private final DeterministicPicker picker;
 
+    /** seed 곡의 언어권(국내/해외)에 후보를 맞출지. 끄면 전체 후보에서 고른다. */
+    @Value("${musing.recommendation.match-seed-language:true}")
+    private boolean matchSeedLanguage;
+
     @Transactional(readOnly = true)
     public RecommendationResponse recommend(Mood mood, Weather weather, LocalDate date,
                                             String seedName, String seedArtist) {
@@ -67,18 +73,45 @@ public class RecommendationService {
             return new RecommendationResponse(null);   // 배치 전이면 줄 곡이 없다
         }
 
-        // 3) 최근 추천 곡 제외
+        // 3) seed와 같은 언어권으로 좁히기 — 한국 곡을 넣으면 한국 곡이 나오도록
+        candidates = matchLanguage(candidates, seedArtist);
+
+        // 4) 최근 추천 곡 제외
         candidates = excludeRecent(candidates, date);
 
-        // 4) 점수 정렬 → 상위 K
+        // 5) 점수 정렬 → 상위 K
         List<CandidateTrack> pool = rankable
                 ? topByScore(candidates, target, weather, seedArtist, seedName)
                 : candidates;
 
-        // 5) 같은 조건이면 같은 곡
+        // 6) 같은 조건이면 같은 곡
         String seedKey = "%d|%s|%s|%s".formatted(DEV_USER_ID, date, mood.name(), weather.name());
         int index = picker.pickIndex(seedKey, pool.size());
         return new RecommendationResponse(pool.get(index).toTrackInfo());
+    }
+
+    /**
+     * seed 아티스트가 한국 가수면 한국 곡만, 해외 가수면 해외 곡만 후보로 남긴다.
+     *
+     * <p>언어가 섞이면 듣는 흐름이 끊긴다 — 리도어를 적었는데 드레이크가 나오면 어색하다.
+     * 가산점(−0.03)만으로는 감정 거리에 밀려 효과가 없어서 <b>후보 단계에서 좁힌다.</b>
+     *
+     * <p>판별은 아티스트명의 한글 포함 여부(§5.3)를 쓴다. 좁힌 결과가 비면 포기하고
+     * 전체 후보를 쓴다 — 곡은 반드시 줘야 하므로.
+     */
+    private List<CandidateTrack> matchLanguage(List<CandidateTrack> candidates, String seedArtist) {
+        if (!matchSeedLanguage || seedArtist == null || seedArtist.isBlank()) return candidates;
+
+        boolean seedIsKorean = KoreanText.containsHangul(seedArtist);
+        List<CandidateTrack> matched = candidates.stream()
+                .filter(c -> Boolean.TRUE.equals(c.isKorean()) == seedIsKorean)
+                .toList();
+
+        if (matched.isEmpty()) {
+            log.debug("seed 언어권({}) 후보가 없어 전체에서 고름", seedIsKorean ? "국내" : "해외");
+            return candidates;
+        }
+        return matched;
     }
 
     /** 최근 N일 안에 추천된 곡을 뺀다. 다 빠져버리면 제외를 포기한다(곡은 줘야 하므로). */

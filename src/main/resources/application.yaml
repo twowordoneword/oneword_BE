@@ -55,6 +55,7 @@ musing:
     weight-acoustic-rain: 0.5   # 비 오는 날 어쿠스틱 가중
     bonus-same-artist: 0.15     # seed와 같은 가수 우대
     bonus-same-genre: 0.05      # seed와 같은 장르 우대
+    match-seed-language: true   # seed가 한국 곡이면 한국 곡만, 해외 곡이면 해외 곡만 후보로
     bonus-korean: 0.03          # 한국 곡 우대(동점 처리용). 0.12는 감정 매칭을 압도해 낮춤
     top-k: 30                   # 상위 30곡 중 고정 시드로 선택(다양성)
     exclude-recent-days: 14     # 최근 추천 곡 제외 기간
