@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
  *
  * <p><b>왜 필요한가</b> — 기분 좌표(슬픔 0.15, 기쁨 0.90)는 0~1 전체를 쓴다는 전제로 정했는데,
  * 실제 분석 모델이 내놓는 valence는 훨씬 좁은 구간에 몰린다.
- * (실측: 김광석의 어두운 포크 곡들도 0.34~0.46, 최솟값이 0.3 근처)
+ * (실측 2026-08-07, 곡 371개: valence 0.25~0.71 — 상단이 0.71이라 기쁨 목표 0.90은 도달 불가였다)
  *
  * <pre>
  * 목표 좌표:  슬픔 0.15 ── 우울 0.20 ─────────────── 기쁨 0.90
@@ -31,24 +31,24 @@ public class EmotionCalibrator {
     @Value("${musing.recommendation.calibrate:true}")
     private boolean enabled = true;
 
-    @Value("${musing.recommendation.valence-min:0.30}")
-    private double valenceMin = 0.30;
+    @Value("${musing.recommendation.valence-min:0.25}")
+    private double valenceMin = 0.25;
 
-    @Value("${musing.recommendation.valence-max:0.75}")
-    private double valenceMax = 0.75;
+    @Value("${musing.recommendation.valence-max:0.71}")
+    private double valenceMax = 0.71;
 
-    @Value("${musing.recommendation.arousal-min:0.10}")
-    private double arousalMin = 0.10;
+    @Value("${musing.recommendation.arousal-min:0.06}")
+    private double arousalMin = 0.06;
 
-    @Value("${musing.recommendation.arousal-max:0.95}")
-    private double arousalMax = 0.95;
+    @Value("${musing.recommendation.arousal-max:1.00}")
+    private double arousalMax = 1.00;
 
     /**
      * 개념 좌표(0~1)를 관측 구간으로 옮긴다.
      *
      * <pre>
-     * 슬픔 valence 0.15 → 0.30 + 0.15 × (0.75 − 0.30) = 0.3675
-     * 기쁨 valence 0.90 → 0.30 + 0.90 × (0.75 − 0.30) = 0.7050
+     * 슬픔 valence 0.15 → 0.25 + 0.15 × (0.71 − 0.25) = 0.319
+     * 기쁨 valence 0.90 → 0.25 + 0.90 × (0.71 − 0.25) = 0.664
      * </pre>
      *
      * 간격이 좁아지지만 <b>순서와 상대적 거리는 그대로</b>라 기분 구분은 유지된다.

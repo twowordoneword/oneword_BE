@@ -41,14 +41,15 @@ musing:
     request-delay-ms: 200     # 동시 6건 제한이 있어 순차 호출
   recommendation:
     # --- 감정 좌표 보정 (§5.5) ---
-    # 기분 좌표는 0~1 전체를 쓰지만 실제 분석값은 좁은 구간에 몰린다(실측: valence 최소 0.3 근처).
+    # 기분 좌표는 0~1 전체를 쓰지만 실제 분석값은 좁은 구간에 몰린다.
     # 목표 좌표를 이 구간으로 옮겨 8개 기분이 서로 구분되게 한다.
-    # ⚠️ 곡 수십 개로 잰 잠정치. 풀이 커지면 MIN/MAX를 다시 재서 갱신할 것.
+    # 실측(2026-08-07, 곡 371개): valence 0.25~0.71 / energy 0.06~1.00
+    # 곡이 크게 늘면 MIN/MAX를 다시 재서 갱신할 것.
     calibrate: true
-    valence-min: 0.30
-    valence-max: 0.75
-    arousal-min: 0.10
-    arousal-max: 0.95
+    valence-min: 0.25
+    valence-max: 0.71
+    arousal-min: 0.06
+    arousal-max: 1.00
     # --- 곡 선택 점수 (§5.1) — 모두 검증 전 시작값 ---
     weight-valence: 1.0         # 밝기 거리 가중
     weight-arousal: 1.0         # 활기 거리 가중
