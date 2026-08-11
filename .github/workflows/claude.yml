@@ -1,0 +1,28 @@
+name: Claude
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  claude:
+    # @claude 가 포함된 코멘트에만 러너를 띄운다
+    if: contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write        # Claude가 파일을 수정·푸시할 수 있게
+      pull-requests: write
+      issues: write
+      id-token: write        # Claude GitHub App 인증에 필요
+      actions: read          # PR의 CI 결과를 읽기 위해
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
