@@ -57,7 +57,7 @@ public class TrackScorer {
     }
 
     private boolean matches(String a, String b) {
-        return a != null && !a.isBlank() && b != null && a.equalsIgnoreCase(b.trim());
+        return a != null && !a.isBlank() && b != null && a.trim().equalsIgnoreCase(b.trim());
     }
 
     private double toDouble(BigDecimal v) {
