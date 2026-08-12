@@ -7,7 +7,7 @@ import com.example.musing_BE.track.dto.TrackInfoResponse;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import com.example.musing_BE.common.http.RestClients;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
@@ -31,17 +31,7 @@ public class ItunesClient {
 
     private final ObjectMapper objectMapper;
 
-    private final RestClient restClient = RestClient.builder()
-            .baseUrl("https://itunes.apple.com")
-            .requestFactory(timeoutFactory())
-            .build();
-
-    private static SimpleClientHttpRequestFactory timeoutFactory() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(3000); // 연결 3초
-        factory.setReadTimeout(5000);    // 응답 5초
-        return factory;
-    }
+    private final RestClient restClient = RestClients.create("https://itunes.apple.com");
 
     /** 곡 검색. country: KR/US 스토어프론트. (사용자 요청 경로 — 실패 시 502) */
     public List<TrackInfoResponse> searchSongs(String term, int limit, String country) {

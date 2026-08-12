@@ -1,6 +1,7 @@
 package com.example.musing_BE.track.batch;
 
-import com.example.musing_BE.recommendation.client.FreqBlogClient;
+import com.example.musing_BE.common.util.Throttle;
+import com.example.musing_BE.track.client.FreqBlogClient;
 import com.example.musing_BE.recommendation.dto.CandidateTrack;
 import com.example.musing_BE.track.dto.FeatureFillResult;
 import com.example.musing_BE.track.repository.TrackRepository;
@@ -70,7 +71,7 @@ public class FeatureFillService {
                 stoppedByQuota = true;
                 break;
             }
-            sleep();
+            Throttle.pause(requestDelayMs);
         }
 
         FeatureFillResult result = new FeatureFillResult(targets.size(), filled, notFound, stoppedByQuota,
@@ -79,13 +80,4 @@ public class FeatureFillService {
         return result;
     }
 
-    private void sleep() {
-        if (requestDelayMs <= 0) return;
-        try {
-            Thread.sleep(requestDelayMs);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("감정값 배치가 중단되었습니다.", e);
-        }
-    }
 }

@@ -1,8 +1,8 @@
 package com.example.musing_BE.track.batch;
 
+import com.example.musing_BE.common.util.Throttle;
 import com.example.musing_BE.track.client.ItunesClient;
 import com.example.musing_BE.track.domain.SurveyEntry;
-import com.example.musing_BE.track.domain.TrackFilter;
 import com.example.musing_BE.track.domain.TrackOrigin;
 import com.example.musing_BE.track.dto.CollectResult;
 import com.example.musing_BE.track.dto.CollectedTrack;
@@ -40,7 +40,7 @@ import java.util.Set;
 public class SurveyCollectService {
 
     private final ItunesClient itunesClient;
-    private final TrackUpsertService trackUpsertService;
+    private final TrackCollector trackCollector;
 
     @Value("${musing.chart.songs-per-artist:50}")
     private int defaultSongsPerArtist;
@@ -73,7 +73,7 @@ public class SurveyCollectService {
             SurveyEntry entry = SurveyEntry.parse(line);
             if (entry == null) continue;
 
-            sleepBetweenCalls();
+            Throttle.pause(requestDelayMs);
             Optional<ItunesClient.ItunesArtist> artist = resolveArtist(entry, sf);
             if (artist.isEmpty()) {
                 notFound++;
@@ -86,23 +86,14 @@ public class SurveyCollectService {
                 log.debug("이미 수집한 가수라 건너뜀: {} ({})", artist.get().artistName(), line);
                 continue;
             }
-            sleepBetweenCalls();
+            Throttle.pause(requestDelayMs);
             candidates.addAll(itunesClient.lookupArtistSongs(artistId, perArtist, sf));
         }
 
-        int skipped = 0;
-        int inserted = 0;
-        int updated = 0;
-        for (CollectedTrack c : candidates) {
-            if (!TrackFilter.isUsable(c)) {
-                skipped++;
-                continue;
-            }
-            if (trackUpsertService.upsert(c, TrackOrigin.SURVEY)) inserted++;
-            else updated++;
-        }
+        TrackCollector.Counts counts = trackCollector.upsertAll(candidates, TrackOrigin.SURVEY);
 
-        CollectResult result = new CollectResult(1, seenArtistIds.size(), candidates.size(), skipped, inserted, updated,
+        CollectResult result = new CollectResult(seenArtistIds.size(), candidates.size(),
+                counts.skipped(), counts.inserted(), counts.updated(),
                 Duration.between(start, Instant.now()).toSeconds());
         log.info("설문 수집 완료: 응답 {}건 → 가수 {}명 확인({}건 미발견), {}",
                 lines.size(), seenArtistIds.size(), notFound, result);
@@ -118,18 +109,9 @@ public class SurveyCollectService {
                     itunesClient.findArtistBySong(entry.searchTerm(), storefront);
             if (bySong.isPresent()) return bySong;
             log.debug("곡으로 가수를 못 찾아 이름 검색으로 폴백: {}", entry.searchTerm());
-            sleepBetweenCalls();
+            Throttle.pause(requestDelayMs);
         }
         return itunesClient.searchArtist(entry.artist(), storefront);
     }
 
-    private void sleepBetweenCalls() {
-        if (requestDelayMs <= 0) return;
-        try {
-            Thread.sleep(requestDelayMs);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("설문 수집 배치가 중단되었습니다.", e);
-        }
-    }
 }

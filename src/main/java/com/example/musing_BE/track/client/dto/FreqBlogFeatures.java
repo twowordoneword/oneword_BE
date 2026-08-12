@@ -1,4 +1,4 @@
-package com.example.musing_BE.recommendation.client.dto;
+package com.example.musing_BE.track.client.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.math.BigDecimal;

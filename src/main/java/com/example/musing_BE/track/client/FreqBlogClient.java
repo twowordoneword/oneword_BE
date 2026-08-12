@@ -1,15 +1,16 @@
-package com.example.musing_BE.recommendation.client;
+package com.example.musing_BE.track.client;
 
-import com.example.musing_BE.recommendation.client.dto.FreqBlogFeatures;
+import com.example.musing_BE.common.http.RestClients;
+import com.example.musing_BE.track.client.dto.FreqBlogFeatures;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Duration;
 import java.util.Optional;
 
 /**
@@ -34,17 +35,9 @@ public class FreqBlogClient {
     @Value("${musing.freqblog.api-key:}")
     private String apiKey;
 
-    private final RestClient restClient = RestClient.builder()
-            .baseUrl("https://api.freqblog.com")
-            .requestFactory(timeoutFactory())
-            .build();
-
-    private static SimpleClientHttpRequestFactory timeoutFactory() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(3000);
-        factory.setReadTimeout(10000); // 카탈로그 미보유 곡은 분석이 붙어 느릴 수 있다
-        return factory;
-    }
+    // 카탈로그에 없는 곡은 분석이 붙어 느릴 수 있어 응답 대기를 길게 잡는다
+    private final RestClient restClient = RestClients.create(
+            "https://api.freqblog.com", Duration.ofSeconds(3), Duration.ofSeconds(10));
 
     public boolean isConfigured() {
         return apiKey != null && !apiKey.isBlank();
@@ -71,7 +64,6 @@ public class FreqBlogClient {
                     .header("X-Api-Key", apiKey)
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, (req, res) -> {
-                        // 여기서 예외를 던지지 않고 아래 catch에서 상태로 분기한다
                         if (res.getStatusCode().value() == 429) {
                             throw new QuotaExceededException();
                         }

@@ -1,8 +1,8 @@
 package com.example.musing_BE.track.batch;
 
+import com.example.musing_BE.common.util.Throttle;
 import com.example.musing_BE.track.client.AppleChartClient;
 import com.example.musing_BE.track.client.ItunesClient;
-import com.example.musing_BE.track.domain.TrackFilter;
 import com.example.musing_BE.track.domain.TrackOrigin;
 import com.example.musing_BE.track.dto.CollectResult;
 import com.example.musing_BE.track.dto.CollectedTrack;
@@ -40,7 +40,7 @@ public class ChartCollectService {
 
     private final AppleChartClient appleChartClient;
     private final ItunesClient itunesClient;
-    private final TrackUpsertService trackUpsertService;
+    private final TrackCollector trackCollector;
 
     @Value("${musing.chart.storefronts:kr,us}")
     private List<String> storefronts;
@@ -83,37 +83,18 @@ public class ChartCollectService {
 
         // 아티스트 카탈로그 확장 — 여기서 후보가 수십 배로 늘어난다
         for (Map.Entry<Long, String> entry : artistStorefront.entrySet()) {
-            sleepBetweenCalls();
+            Throttle.pause(requestDelayMs);
             candidates.addAll(itunesClient.lookupArtistSongs(entry.getKey(), songsPerArtist, entry.getValue()));
         }
 
         int fetched = candidates.size();
-        int skipped = 0;
-        int inserted = 0;
-        int updated = 0;
-        for (CollectedTrack c : candidates) {
-            if (!TrackFilter.isUsable(c)) {
-                skipped++;
-                continue;
-            }
-            if (trackUpsertService.upsert(c, TrackOrigin.CHART)) inserted++;
-            else updated++;
-        }
+        TrackCollector.Counts counts = trackCollector.upsertAll(candidates, TrackOrigin.CHART);
 
-        CollectResult result = new CollectResult(storefronts.size(), artistStorefront.size(),
-                fetched, skipped, inserted, updated,
+        CollectResult result = new CollectResult(artistStorefront.size(),
+                fetched, counts.skipped(), counts.inserted(), counts.updated(),
                 java.time.Duration.between(start, Instant.now()).toSeconds());
         log.info("수집 완료: {}", result);
         return result;
     }
 
-    private void sleepBetweenCalls() {
-        if (requestDelayMs <= 0) return;
-        try {
-            Thread.sleep(requestDelayMs);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("수집 배치가 중단되었습니다.", e);
-        }
-    }
 }

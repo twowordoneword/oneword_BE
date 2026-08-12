@@ -35,13 +35,13 @@ import static org.mockito.Mockito.verify;
 class SurveyCollectServiceTest {
 
     @Mock ItunesClient itunesClient;
-    @Mock TrackUpsertService trackUpsertService;
+    @Mock TrackCollector trackCollector;
 
     SurveyCollectService service;
 
     @BeforeEach
     void setUp() {
-        service = new SurveyCollectService(itunesClient, trackUpsertService);
+        service = new SurveyCollectService(itunesClient, trackCollector);
         ReflectionTestUtils.setField(service, "defaultSongsPerArtist", 10);
         ReflectionTestUtils.setField(service, "requestDelayMs", 0L);   // 테스트에서는 대기 없음
     }
@@ -82,7 +82,7 @@ class SurveyCollectServiceTest {
                 .willReturn(Optional.of(new ItunesClient.ItunesArtist(100L, "아이유", "K-Pop")));
         given(itunesClient.lookupArtistSongs(anyLong(), anyInt(), anyString()))
                 .willReturn(List.of(track("밤편지", "아이유", "preview", "앨범")));
-        given(trackUpsertService.upsert(any(), any())).willReturn(true);
+        given(trackCollector.upsertAll(any(), any())).willReturn(new TrackCollector.Counts(0, 1, 0));
 
         CollectResult result = service.collect(List.of("없는가수", "아이유"), "kr", 10);
 
@@ -91,52 +91,17 @@ class SurveyCollectServiceTest {
     }
 
     @Test
-    @DisplayName("미리듣기가 없는 곡은 저장하지 않는다")
-    void skipsTracksWithoutPreview() {
+    @DisplayName("수집한 곡은 origin=SURVEY로 넘긴다")
+    void passesSurveyOrigin() {
         given(itunesClient.searchArtist(anyString(), anyString()))
-                .willReturn(Optional.of(new ItunesClient.ItunesArtist(100L, "아이유", "K-Pop")));
-        given(itunesClient.lookupArtistSongs(anyLong(), anyInt(), anyString())).willReturn(List.of(
-                track("정상곡", "아이유", "preview", "앨범"),
-                track("미리듣기없음", "아이유", null, "앨범"),
-                track("빈문자열", "아이유", "  ", "앨범")));
-        given(trackUpsertService.upsert(any(), any())).willReturn(true);
-
-        CollectResult result = service.collect(List.of("아이유"), "kr", 10);
-
-        assertThat(result.skipped()).isEqualTo(2);
-        assertThat(result.inserted()).isEqualTo(1);
-        verify(trackUpsertService, times(1)).upsert(any(), eq(TrackOrigin.SURVEY));
-    }
-
-    @Test
-    @DisplayName("DJ Mix 음원은 제외한다")
-    void skipsDjMix() {
-        given(itunesClient.searchArtist(anyString(), anyString()))
-                .willReturn(Optional.of(new ItunesClient.ItunesArtist(100L, "아이유", "K-Pop")));
-        given(itunesClient.lookupArtistSongs(anyLong(), anyInt(), anyString())).willReturn(List.of(
-                track("정상곡", "아이유", "preview", "정규앨범"),
-                track("믹스곡", "아이유", "preview", "INS LAND: DJ Mix")));
-        given(trackUpsertService.upsert(any(), any())).willReturn(true);
-
-        CollectResult result = service.collect(List.of("아이유"), "kr", 10);
-
-        assertThat(result.skipped()).isEqualTo(1);
-        assertThat(result.inserted()).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("origin은 항상 SURVEY로 저장된다")
-    void savesWithSurveyOrigin() {
-        given(itunesClient.searchArtist(anyString(), anyString()))
-                .willReturn(Optional.of(new ItunesClient.ItunesArtist(100L, "김광석", "발라드")));
+                .willReturn(Optional.of(new ItunesClient.ItunesArtist(100L, "김광석", "포크")));
         given(itunesClient.lookupArtistSongs(anyLong(), anyInt(), anyString()))
                 .willReturn(List.of(track("서른 즈음에", "김광석", "preview", "앨범")));
-        given(trackUpsertService.upsert(any(), any())).willReturn(true);
 
         service.collect(List.of("김광석"), "kr", 10);
 
         ArgumentCaptor<TrackOrigin> origin = ArgumentCaptor.forClass(TrackOrigin.class);
-        verify(trackUpsertService).upsert(any(), origin.capture());
+        verify(trackCollector).upsertAll(any(), origin.capture());
         assertThat(origin.getValue()).isEqualTo(TrackOrigin.SURVEY);
     }
 

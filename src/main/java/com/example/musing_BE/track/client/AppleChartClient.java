@@ -3,7 +3,7 @@ package com.example.musing_BE.track.client;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import com.example.musing_BE.common.http.RestClients;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
@@ -24,17 +24,7 @@ public class AppleChartClient {
 
     private final ObjectMapper objectMapper;
 
-    private final RestClient restClient = RestClient.builder()
-            .baseUrl("https://rss.marketingtools.apple.com")
-            .requestFactory(timeoutFactory())
-            .build();
-
-    private static SimpleClientHttpRequestFactory timeoutFactory() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(3000);
-        factory.setReadTimeout(5000);
-        return factory;
-    }
+    private final RestClient restClient = RestClients.create("https://rss.marketingtools.apple.com");
 
     /**
      * 인기곡 차트 조회. 실패 시 예외 대신 빈 목록 — 배치가 다른 스토어프론트를 계속 처리하도록.
