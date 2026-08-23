@@ -1,5 +1,7 @@
 package com.example.musing_BE.diary.dto;
 
+import com.example.musing_BE.track.domain.KoreanText;
+import com.example.musing_BE.track.domain.TrackOrigin;
 import com.example.musing_BE.track.entity.Track;
 import jakarta.validation.constraints.NotBlank;
 
@@ -18,10 +20,13 @@ public record TrackDto(
                 t.getArtworkUrl(), t.getPreviewUrl());
     }
 
+    /** 일기에서 유입된 곡 → origin=USER. 한국 곡 여부는 아티스트명으로 판정(§5.3). */
     public Track toNewEntity() {
         return Track.builder()
                 .name(name).artist(artist).album(album)
                 .artworkUrl(artworkUrl).previewUrl(previewUrl)
+                .origin(TrackOrigin.USER)
+                .isKorean(KoreanText.containsHangul(artist))
                 .build();
     }
 }

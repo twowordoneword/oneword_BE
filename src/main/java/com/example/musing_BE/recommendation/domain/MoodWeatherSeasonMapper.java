@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 
 /**
- * 기분·날씨·계절 → 목표 감정 좌표 + iTunes 검색어 매핑 (RECOMMENDATION.md §3).
+ * 기분·날씨·계절 → 목표 감정 좌표 매핑 (RECOMMENDATION.md §3).
  * 값은 시작값이며 실제 청취 튜닝 대상.
  */
 @Component
@@ -53,21 +53,4 @@ public class MoodWeatherSeasonMapper {
         return new double[]{0.00, -0.05};                        // 겨울
     }
 
-    /** seed 아티스트가 없을 때 iTunes 검색어(장르 키워드). */
-    public String genreTerm(Mood mood) {
-        return switch (mood) {
-            case JOY -> "K-Pop";
-            case CALM -> "acoustic";
-            case NORMAL, UNKNOWN -> "pop";
-            case STUFFY -> "alternative";
-            case ANGRY -> "rock";
-            case GLOOM, SAD -> "ballad";
-        };
-    }
-
-    /** seed 아티스트에 한글이 있으면 국내(KR), 없으면 해외(US). null이면 KR 기본. */
-    public String storefront(String seedArtist) {
-        if (seedArtist == null || seedArtist.isBlank()) return "KR";
-        return seedArtist.chars().anyMatch(c -> c >= 0xAC00 && c <= 0xD7A3) ? "KR" : "US";
-    }
 }
