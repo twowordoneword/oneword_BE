@@ -8,7 +8,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@DisplayName("TrackSearchRateLimiter — 사용자/IP 요청 제한")
+@DisplayName("TrackSearchRateLimiter — 사용자별 요청 제한")
 class TrackSearchRateLimiterTest {
 
     @Test
@@ -18,10 +18,10 @@ class TrackSearchRateLimiterTest {
         ReflectionTestUtils.setField(limiter, "maxRequests", 2);
         ReflectionTestUtils.setField(limiter, "windowSeconds", 60L);
 
-        limiter.checkOrThrow(10L, "127.0.0.1");
-        limiter.checkOrThrow(10L, "127.0.0.1");
+        limiter.checkOrThrow(10L);
+        limiter.checkOrThrow(10L);
 
-        assertThatThrownBy(() -> limiter.checkOrThrow(10L, "127.0.0.1"))
+        assertThatThrownBy(() -> limiter.checkOrThrow(10L))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.RATE_LIMIT_EXCEEDED);
     }
@@ -33,9 +33,9 @@ class TrackSearchRateLimiterTest {
         ReflectionTestUtils.setField(limiter, "maxRequests", 1);
         ReflectionTestUtils.setField(limiter, "windowSeconds", 1L);
 
-        limiter.checkOrThrow(11L, "127.0.0.1");
+        limiter.checkOrThrow(11L);
         Thread.sleep(1100L);
 
-        limiter.checkOrThrow(11L, "127.0.0.1");
+        limiter.checkOrThrow(11L);
     }
 }

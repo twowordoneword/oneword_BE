@@ -16,7 +16,11 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    /**
+     * 유니크 제약을 두지 않는다. 같은 사람이 카카오와 구글로 각각 가입하면 이메일이 겹치는데,
+     * 유니크를 걸면 두 번째 가입이 영구히 막힌다. 계정 식별은 (provider, providerId)가 담당한다.
+     */
+    @Column(nullable = false)
     private String email;
 
     @Column(nullable = false, length = 50)

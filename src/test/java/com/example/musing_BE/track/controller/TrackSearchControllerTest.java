@@ -19,7 +19,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.doThrow;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -33,7 +32,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "app.auth.access-token-seconds=3600",
         "app.auth.refresh-token-seconds=1209600",
         "app.auth.google-client-id=test-google-client-id",
-        "app.auth.apple-client-id=test-apple-client-id"
+        "app.auth.apple-client-id=test-apple-client-id",
+        "app.auth.kakao-app-id=test-kakao-app-id",
+        "app.auth.naver-client-id=test-naver-client-id",
+        "app.auth.naver-client-secret=test-naver-client-secret"
 })
 @DisplayName("TrackSearchController HTTP 계약 테스트")
 class TrackSearchControllerTest {
@@ -71,7 +73,7 @@ class TrackSearchControllerTest {
     void returns429WhenRateLimitExceeded() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
         doThrow(new BusinessException(ErrorCode.RATE_LIMIT_EXCEEDED))
-                .when(trackSearchRateLimiter).checkOrThrow(anyLong(), anyString());
+                .when(trackSearchRateLimiter).checkOrThrow(anyLong());
 
         mvc.perform(get("/api/v1/tracks/search").param("q", "아이유").param("limit", "20"))
                 .andExpect(status().isTooManyRequests())

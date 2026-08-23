@@ -24,16 +24,29 @@ public final class RestClients {
     }
 
     /**
+     * baseUrl 없이 매 호출마다 절대 URL을 주는 경우(호스트가 여러 개인 소셜 인증 등)용.
+     * 타임아웃 기본값은 {@link #create(String)}과 같다.
+     */
+    public static RestClient createDefault() {
+        return build(null, Duration.ofSeconds(3), Duration.ofSeconds(5));
+    }
+
+    /**
      * @param connectTimeout 연결 자체가 안 될 때까지 기다릴 시간
      * @param readTimeout    연결은 됐는데 데이터가 안 올 때까지 기다릴 시간
      */
     public static RestClient create(String baseUrl, Duration connectTimeout, Duration readTimeout) {
+        return build(baseUrl, connectTimeout, readTimeout);
+    }
+
+    private static RestClient build(String baseUrl, Duration connectTimeout, Duration readTimeout) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout((int) connectTimeout.toMillis());
         factory.setReadTimeout((int) readTimeout.toMillis());
-        return RestClient.builder()
-                .baseUrl(baseUrl)
-                .requestFactory(factory)
-                .build();
+        RestClient.Builder builder = RestClient.builder().requestFactory(factory);
+        if (baseUrl != null) {
+            builder.baseUrl(baseUrl);
+        }
+        return builder.build();
     }
 }
