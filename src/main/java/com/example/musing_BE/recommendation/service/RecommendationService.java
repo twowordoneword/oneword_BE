@@ -10,6 +10,7 @@ import com.example.musing_BE.recommendation.domain.ScoringWeights;
 import com.example.musing_BE.recommendation.domain.TrackScorer;
 import com.example.musing_BE.recommendation.dto.CandidateTrack;
 import com.example.musing_BE.recommendation.dto.RecommendationResponse;
+import com.example.musing_BE.security.CurrentUserProvider;
 import com.example.musing_BE.track.domain.KoreanText;
 import com.example.musing_BE.track.repository.TrackRepository;
 import lombok.RequiredArgsConstructor;
@@ -42,10 +43,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RecommendationService {
 
-    /** 인증 도입 전 임시 사용자 (DiaryService·StatsService와 동일 관례). */
-    private static final Long DEV_USER_ID = 1L;
-
     private final TrackRepository trackRepository;
+    private final CurrentUserProvider currentUserProvider;
     private final MoodWeatherSeasonMapper mapper;
     private final EmotionCalibrator calibrator;
     private final TrackScorer scorer;
@@ -59,6 +58,8 @@ public class RecommendationService {
     @Transactional(readOnly = true)
     public RecommendationResponse recommend(Mood mood, Weather weather, LocalDate date,
                                             String seedName, String seedArtist) {
+        Long userId = currentUserProvider.getCurrentUserId();
+
         // 1) 목표 감정 좌표 — 개념 좌표를 실제 곡 분포에 맞춰 보정한다
         EmotionPoint target = calibrator.calibrate(mapper.target(mood, weather, date));
 
@@ -77,7 +78,7 @@ public class RecommendationService {
         candidates = matchLanguage(candidates, seedArtist);
 
         // 4) 최근 추천 곡 제외
-        candidates = excludeRecent(candidates, date);
+        candidates = excludeRecent(userId, candidates, date);
 
         // 5) 점수 정렬 → 상위 K
         List<CandidateTrack> pool = rankable
@@ -85,7 +86,7 @@ public class RecommendationService {
                 : candidates;
 
         // 6) 같은 조건이면 같은 곡
-        String seedKey = "%d|%s|%s|%s".formatted(DEV_USER_ID, date, mood.name(), weather.name());
+        String seedKey = "%d|%s|%s|%s".formatted(userId, date, mood.name(), weather.name());
         int index = picker.pickIndex(seedKey, pool.size());
         return new RecommendationResponse(pool.get(index).toTrackInfo());
     }
@@ -115,12 +116,12 @@ public class RecommendationService {
     }
 
     /** 최근 N일 안에 추천된 곡을 뺀다. 다 빠져버리면 제외를 포기한다(곡은 줘야 하므로). */
-    private List<CandidateTrack> excludeRecent(List<CandidateTrack> candidates, LocalDate date) {
+    private List<CandidateTrack> excludeRecent(Long userId, List<CandidateTrack> candidates, LocalDate date) {
         int days = weights.getExcludeRecentDays();
         if (days <= 0) return candidates;
 
         Set<Long> recent = new HashSet<>(
-                trackRepository.findRecentlyRecommendedTrackIds(DEV_USER_ID, date.minusDays(days)));
+                trackRepository.findRecentlyRecommendedTrackIds(userId, date.minusDays(days)));
         if (recent.isEmpty()) return candidates;
 
         List<CandidateTrack> filtered = candidates.stream()

@@ -9,6 +9,7 @@ import com.example.musing_BE.recommendation.domain.ScoringWeights;
 import com.example.musing_BE.recommendation.domain.TrackScorer;
 import com.example.musing_BE.recommendation.dto.CandidateTrack;
 import com.example.musing_BE.recommendation.dto.RecommendationResponse;
+import com.example.musing_BE.security.CurrentUserProvider;
 import com.example.musing_BE.track.repository.TrackRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +36,7 @@ import static org.mockito.BDDMockito.given;
 class RecommendationServiceTest {
 
     @Mock TrackRepository trackRepository;
+    @Mock CurrentUserProvider currentUserProvider;
 
     RecommendationService service;
 
@@ -54,11 +56,13 @@ class RecommendationServiceTest {
 
         service = new RecommendationService(
                 trackRepository,
+                currentUserProvider,
                 new MoodWeatherSeasonMapper(),
                 new EmotionCalibrator(),
                 new TrackScorer(weights),
                 weights,
                 new DeterministicPicker());
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
         ReflectionTestUtils.setField(service, "matchSeedLanguage", true);
     }
 
