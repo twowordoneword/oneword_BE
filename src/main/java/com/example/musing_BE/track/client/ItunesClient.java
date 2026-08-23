@@ -5,16 +5,23 @@ import com.example.musing_BE.common.exception.ErrorCode;
 import com.example.musing_BE.track.dto.CollectedTrack;
 import com.example.musing_BE.track.dto.TrackInfoResponse;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.example.musing_BE.common.http.RestClients;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Semaphore;
 
 /**
  * iTunes Search/Lookup API 프록시 (무료·무인증).
@@ -28,28 +35,46 @@ public class ItunesClient {
 
     /** lookup의 id 파라미터에 한 번에 넣을 최대 개수. */
     private static final int LOOKUP_BATCH = 100;
+    private static final int MAX_RETRY_ATTEMPTS = 3;
 
     private final ObjectMapper objectMapper;
 
-    private final RestClient restClient = RestClients.create("https://itunes.apple.com");
+    @Value("${musing.track-search.external.bulkhead.max-concurrent:20}")
+    private int maxConcurrentCalls;
+
+    @Value("${musing.track-search.external.retry.backoff-ms:120}")
+    private long retryBackoffMs;
+
+    @Value("${musing.track-search.external.circuit.failure-threshold:5}")
+    private int circuitFailureThreshold;
+
+    @Value("${musing.track-search.external.circuit.open-seconds:30}")
+    private long circuitOpenSeconds;
+
+    private volatile CircuitState circuitState = new CircuitState(0, Instant.EPOCH);
+    private Semaphore searchBulkhead;
+
+    private final RestClient restClient = RestClients.create(
+            "https://itunes.apple.com", Duration.ofSeconds(2), Duration.ofSeconds(3));
+
+    @PostConstruct
+    void initBulkhead() {
+        searchBulkhead = new Semaphore(Math.max(maxConcurrentCalls, 1), true);
+    }
 
     /** 곡 검색. country: KR/US 스토어프론트. (사용자 요청 경로 — 실패 시 502) */
     public List<TrackInfoResponse> searchSongs(String term, int limit, String country) {
         String raw;
+        if (isCircuitOpen()) {
+            throw new BusinessException(ErrorCode.EXTERNAL_API_UNAVAILABLE);
+        }
+        if (!searchBulkhead.tryAcquire()) {
+            throw new BusinessException(ErrorCode.EXTERNAL_API_UNAVAILABLE);
+        }
         try {
-            raw = restClient.get()
-                    .uri(uriBuilder -> uriBuilder.path("/search")
-                            .queryParam("term", term)
-                            .queryParam("media", "music")
-                            .queryParam("entity", "song")
-                            .queryParam("limit", limit)
-                            .queryParam("country", country)
-                            .build())
-                    .retrieve()
-                    .body(String.class);
-        } catch (Exception e) {
-            log.warn("iTunes 검색 실패 (term={}): {}", term, e.getMessage());
-            throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
+            raw = executeSearchWithRetry(term, limit, country);
+        } finally {
+            searchBulkhead.release();
         }
 
         if (raw == null || raw.isBlank()) {
@@ -66,7 +91,114 @@ public class ItunesClient {
                     .toList();
         } catch (Exception e) {
             log.warn("iTunes 응답 파싱 실패: {}", e.getMessage());
+            recordFailure();
             throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
+        }
+    }
+
+    private String executeSearchWithRetry(String term, int limit, String country) {
+        Exception lastException = null;
+        for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+            try {
+                String body = restClient.get()
+                        .uri(uriBuilder -> uriBuilder.path("/search")
+                                .queryParam("term", term)
+                                .queryParam("media", "music")
+                                .queryParam("entity", "song")
+                                .queryParam("limit", limit)
+                                .queryParam("country", country)
+                                .build())
+                        .retrieve()
+                        .onStatus(HttpStatusCode::isError, (req, res) -> {
+                            int status = res.getStatusCode().value();
+                            if (status >= 500) {
+                                throw new RetryableExternalException("iTunes 5xx: " + status);
+                            }
+                            throw new NonRetryableExternalException("iTunes 4xx: " + status);
+                        })
+                        .body(String.class);
+                recordSuccess();
+                return body;
+            } catch (RetryableExternalException | ResourceAccessException e) {
+                lastException = e;
+                if (attempt < MAX_RETRY_ATTEMPTS) {
+                    pauseRetryBackoff(attempt);
+                    continue;
+                }
+                recordFailure();
+                throw mapToBusinessException(e, term);
+            } catch (NonRetryableExternalException e) {
+                recordFailure();
+                throw mapToBusinessException(e, term);
+            } catch (BusinessException e) {
+                recordFailure();
+                throw e;
+            } catch (Exception e) {
+                lastException = e;
+                if (attempt < MAX_RETRY_ATTEMPTS) {
+                    pauseRetryBackoff(attempt);
+                    continue;
+                }
+                recordFailure();
+                throw mapToBusinessException(e, term);
+            }
+        }
+        recordFailure();
+        throw mapToBusinessException(lastException, term);
+    }
+
+    private void pauseRetryBackoff(int attempt) {
+        long waitMillis = Math.max(retryBackoffMs, 20) * attempt;
+        try {
+            Thread.sleep(waitMillis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException(ErrorCode.EXTERNAL_API_UNAVAILABLE);
+        }
+    }
+
+    private BusinessException mapToBusinessException(Exception exception, String term) {
+        if (exception instanceof ResourceAccessException) {
+            log.warn("iTunes 검색 타임아웃/연결 실패 (queryLength={}): {}", safeLength(term), exception.getMessage());
+            return new BusinessException(ErrorCode.EXTERNAL_API_TIMEOUT);
+        }
+        log.warn("iTunes 검색 실패 (queryLength={}): {}", safeLength(term), exception == null ? "unknown" : exception.getMessage());
+        return new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
+    }
+
+    private int safeLength(String term) {
+        return term == null ? 0 : Math.min(term.length(), 256);
+    }
+
+    private synchronized void recordSuccess() {
+        circuitState = new CircuitState(0, Instant.EPOCH);
+    }
+
+    private synchronized void recordFailure() {
+        int next = circuitState.consecutiveFailures + 1;
+        Instant openedUntil = circuitState.openedUntil;
+        if (next >= Math.max(circuitFailureThreshold, 1)) {
+            openedUntil = Instant.now().plusSeconds(Math.max(circuitOpenSeconds, 1));
+            next = 0;
+        }
+        circuitState = new CircuitState(next, openedUntil);
+    }
+
+    private boolean isCircuitOpen() {
+        return circuitState.openedUntil.isAfter(Instant.now());
+    }
+
+    private record CircuitState(int consecutiveFailures, Instant openedUntil) {}
+
+    private static class RetryableExternalException extends RuntimeException {
+        RetryableExternalException(String message) {
+            super(message);
+        }
+    }
+
+    private static class NonRetryableExternalException extends RuntimeException {
+        NonRetryableExternalException(String message) {
+            super(message);
         }
     }
 

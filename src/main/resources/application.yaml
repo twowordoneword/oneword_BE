@@ -40,6 +40,20 @@ app:
 
 # ----- 뮤징 추천/수집 설정 (RECOMMENDATION_STAGE2 §7) -----
 musing:
+  track-search:
+    cache:
+      ttl-seconds: 30
+    rate-limit:
+      max-requests: 30
+      window-seconds: 60
+    external:
+      bulkhead:
+        max-concurrent: 20
+      retry:
+        backoff-ms: 120
+      circuit:
+        failure-threshold: 5
+        open-seconds: 30
   chart:
     enabled: false            # 자동 실행 스위치. 설문 수집을 먼저 하므로 꺼 둠(수동 트리거는 가능)
     storefronts: kr,us        # 후보 풀 수집 대상. kr만 쓰려면 'kr'
