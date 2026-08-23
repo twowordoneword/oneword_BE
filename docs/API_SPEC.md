@@ -277,6 +277,12 @@ Spring Boot 백엔드(`musing_BE`)용 REST API 명세. 프론트(Flutter) 핸드
 }
 ```
 
+정책:
+- 집계 범위는 **전체 기간**(all-time)이며 `month` 쿼리 파라미터는 받지 않는다.
+- `todayWritten` 및 `currentStreak`의 날짜 기준은 **KST(Asia/Seoul)** 이다.
+- `currentStreak`는 최신 작성일이 오늘 또는 어제일 때만 시작되며, 월 경계를 넘어도 날짜가 연속이면 이어서 계산한다.
+- `topMood`는 일기가 없으면 `null` 이고, 최다 빈도 동률이면 기분 코드(한글) **가나다 오름차순**으로 1개를 선택한다.
+
 ---
 
 > **홈 화면 앨범 커버 출처**: 메인 화면의 "오늘의 곡" 커버는 `GET /diaries/{today}` 응답의 `myTrack.artworkUrl`(없으면 `todayTrack.artworkUrl`)을 사용한다. 오늘 일기가 없으면 404 → 빈 상태로 표시. 캘린더 커버는 `GET /diaries?month=`의 `coverArtworkUrl`. 커버 원본은 모두 `tracks.artwork_url`.

@@ -9,8 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 
 @Service
@@ -20,14 +20,14 @@ public class StatsService {
 
     private final DiaryRepository diaryRepository;
     private final CurrentUserProvider currentUserProvider;
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private final Clock kstClock;
 
     public StatsResponse getStats() {
         Long userId = currentUserProvider.getCurrentUserId();
         long totalDiaries = diaryRepository.countByUserId(userId);
         long totalMusic = diaryRepository.countDiariesWithRole(userId, TrackRole.MY);
 
-        LocalDate today = LocalDate.now(KST);
+        LocalDate today = LocalDate.now(kstClock);
         boolean todayWritten = diaryRepository.existsByUserIdAndDiaryDate(userId, today);
         long currentStreak = calculateCurrentStreak(today, diaryRepository.findDiaryDatesByUserIdOrderByDiaryDateDesc(userId));
         String topMood = resolveTopMood(userId);
@@ -61,7 +61,26 @@ public class StatsService {
         if (moodCounts.isEmpty()) {
             return null;
         }
-        Object mood = moodCounts.getFirst()[0];
+
+        String selectedMood = null;
+        long maxCount = Long.MIN_VALUE;
+        for (Object[] moodCount : moodCounts) {
+            String moodCode = toMoodCode(moodCount[0]);
+            long count = moodCount[1] instanceof Number n ? n.longValue() : 0L;
+            if (count > maxCount) {
+                maxCount = count;
+                selectedMood = moodCode;
+                continue;
+            }
+            if (count == maxCount && moodCode != null && (selectedMood == null || moodCode.compareTo(selectedMood) < 0)) {
+                selectedMood = moodCode;
+            }
+        }
+
+        return selectedMood;
+    }
+
+    private String toMoodCode(Object mood) {
         if (mood instanceof Mood m) {
             return m.getCode();
         }

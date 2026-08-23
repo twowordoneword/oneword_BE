@@ -122,12 +122,20 @@ class DiaryUserIsolationIntegrationTest {
         mvc.perform(get("/api/v1/stats")
                         .header("Authorization", userAToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.totalDiaries").value(1));
+                .andExpect(jsonPath("$.data.totalDiaries").value(1))
+                .andExpect(jsonPath("$.data.totalMusic").value(0))
+                .andExpect(jsonPath("$.data.currentStreak").value(0))
+                .andExpect(jsonPath("$.data.todayWritten").value(false))
+                .andExpect(jsonPath("$.data.topMood").value("평온"));
 
         mvc.perform(get("/api/v1/stats")
                         .header("Authorization", userBToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.totalDiaries").value(1));
+                .andExpect(jsonPath("$.data.totalDiaries").value(1))
+                .andExpect(jsonPath("$.data.totalMusic").value(0))
+                .andExpect(jsonPath("$.data.currentStreak").value(0))
+                .andExpect(jsonPath("$.data.todayWritten").value(false))
+                .andExpect(jsonPath("$.data.topMood").value("평온"));
     }
 
     private String diaryBody(LocalDate date, String title) {
