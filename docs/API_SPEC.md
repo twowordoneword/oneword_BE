@@ -247,6 +247,14 @@ Spring Boot 백엔드(`musing_BE`)용 REST API 명세. 프론트(Flutter) 핸드
 }
 ```
 > 검색 단계 결과는 아직 DB 미저장이라 `id` 없음. 일기 저장 시 서버가 `track`을 upsert.
+> 동일 사용자/검색어/limit 조합은 짧은 TTL 동안 캐시를 재사용한다. 외부 API 장애 시 캐시가 있으면 stale 데이터를 반환해 지연 전파를 줄인다.
+>
+> **오류 응답**
+> - `401 UNAUTHORIZED`: 인증 없음/토큰 무효
+> - `429 RATE_LIMIT_EXCEEDED`: 사용자/IP 기준 요청 한도 초과
+> - `502 EXTERNAL_API_ERROR`: 외부 API 일반 실패
+> - `503 EXTERNAL_API_UNAVAILABLE`: 외부 API 장애 감지(회로 차단/동시호출 제한)
+> - `504 EXTERNAL_API_TIMEOUT`: 외부 API 응답 지연
 
 ---
 

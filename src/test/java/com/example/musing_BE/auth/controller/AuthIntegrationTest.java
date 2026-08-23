@@ -92,6 +92,14 @@ class AuthIntegrationTest {
     }
 
     @Test
+    @DisplayName("인증 없이 곡 검색 API 호출 시 401을 반환한다")
+    void trackSearchUnauthorizedWhenNoBearerToken() throws Exception {
+        mvc.perform(get("/api/v1/tracks/search").param("q", "아이유"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
     @DisplayName("로그인 성공 후 /auth/me에서 본인 프로필을 조회할 수 있다")
     void loginAndMeSuccess() throws Exception {
         LoginTokens tokens = login("me-user", "door", "kakao");
