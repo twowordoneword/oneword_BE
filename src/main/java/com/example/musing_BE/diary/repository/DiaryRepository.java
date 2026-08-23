@@ -14,6 +14,7 @@ public interface DiaryRepository extends JpaRepository<Diary, Long> {
     Optional<Diary> findByUserIdAndDiaryDate(Long userId, LocalDate diaryDate);
 
     boolean existsByUserIdAndDiaryDate(Long userId, LocalDate diaryDate);
+    void deleteByUserId(Long userId);
 
     /** 월별 조회 — 곡까지 fetch join으로 한 번에 (N+1 방지). */
     @Query("select distinct d from Diary d "

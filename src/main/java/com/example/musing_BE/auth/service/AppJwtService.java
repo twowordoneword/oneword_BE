@@ -37,7 +37,7 @@ public class AppJwtService {
     }
 
     public Long parseAccessToken(String token) {
-        Claims claims = parseClaims(token);
+        Claims claims = parseClaims(token, ErrorCode.UNAUTHORIZED);
         if (!"access".equals(claims.get("type", String.class))) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
@@ -45,7 +45,7 @@ public class AppJwtService {
     }
 
     public Long parseRefreshToken(String token) {
-        Claims claims = parseClaims(token);
+        Claims claims = parseClaims(token, ErrorCode.INVALID_REFRESH_TOKEN);
         if (!"refresh".equals(claims.get("type", String.class))) {
             throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
@@ -64,7 +64,7 @@ public class AppJwtService {
                 .compact();
     }
 
-    private Claims parseClaims(String token) {
+    private Claims parseClaims(String token, ErrorCode errorCode) {
         try {
             return Jwts.parser()
                     .verifyWith(secretKey)
@@ -72,7 +72,7 @@ public class AppJwtService {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (Exception e) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+            throw new BusinessException(errorCode);
         }
     }
 
