@@ -5,7 +5,7 @@ spring:
     password: ${DB_PASSWORD:musing}
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     defer-datasource-initialization: false
     properties:
       hibernate:
@@ -15,7 +15,9 @@ spring:
     init:
       mode: never
   flyway:
-    enabled: false
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
 
 app:
   cors:
