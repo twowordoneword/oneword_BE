@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/musing?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    username: ${DB_USERNAME:musing}
+    password: ${DB_PASSWORD:musing}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    defer-datasource-initialization: false
+    properties:
+      hibernate:
+        format_sql: false
+    show-sql: false
+  sql:
+    init:
+      mode: never
+  flyway:
+    enabled: true
+
+app:
+  cors:
+    allowed-origin-patterns: http://localhost:*
+  auth:
+    jwt-secret: ${APP_JWT_SECRET:test-jwt-secret-at-least-32-bytes}
+    access-token-seconds: ${APP_ACCESS_TOKEN_SECONDS:3600}
+    refresh-token-seconds: ${APP_REFRESH_TOKEN_SECONDS:1209600}
+    google-client-id: ${GOOGLE_CLIENT_ID:test-google-client-id}
+    apple-client-id: ${APPLE_CLIENT_ID:test-apple-client-id}

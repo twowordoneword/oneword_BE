@@ -5,11 +5,12 @@ Spring Boot 기반 뮤징 백엔드입니다.
 ## 빠른 시작
 ```bash
 docker compose up -d
-./gradlew bootRun
+SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
 ```
 
 ## 프로파일
-- 기본 프로파일: `local`
+- 기본값(프로파일 미지정): 운영 안전 설정(`ddl-auto=validate`, `sql.init.mode=never`)
+- 로컬 개발: `SPRING_PROFILES_ACTIVE=local`
 - 운영 실행 예시:
 ```bash
 SPRING_PROFILES_ACTIVE=prod \
