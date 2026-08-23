@@ -43,6 +43,7 @@ jobs:
       - name: Build & Test
         run: ./gradlew build
         env:
+          SPRING_PROFILES_ACTIVE: test
           DB_URL: jdbc:mysql://localhost:3306/musing?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
           DB_USERNAME: musing
           DB_PASSWORD: musing
