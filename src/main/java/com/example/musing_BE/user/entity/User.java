@@ -39,4 +39,21 @@ public class User {
 
     @PreUpdate
     void onUpdate() { this.updatedAt = LocalDateTime.now(); }
+
+    private User(String email, String nickname, String provider, String providerId) {
+        this.email = email;
+        this.nickname = nickname;
+        this.provider = provider;
+        this.providerId = providerId;
+    }
+
+    public static User create(String email, String nickname, String provider, String providerId) {
+        return new User(email, nickname, provider, providerId);
+    }
+
+    public void updateNickname(String nickname) {
+        if (nickname != null && !nickname.isBlank()) {
+            this.nickname = nickname;
+        }
+    }
 }

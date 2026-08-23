@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    # 계정은 환경변수로 주입(없으면 로컬 기본값). 배포 시 실제 값은 env로만 전달 — 커밋 금지.
+    url: ${DB_URL:jdbc:mysql://localhost:3306/musing?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    username: ${DB_USERNAME:musing}
+    password: ${DB_PASSWORD:musing}
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    defer-datasource-initialization: true
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: true
+  sql:
+    init:
+      mode: always
+
+app:
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:*}
+  auth:
+    jwt-secret: ${APP_JWT_SECRET:local-dev-jwt-secret-change-this-at-least-32-bytes}
+    access-token-seconds: ${APP_ACCESS_TOKEN_SECONDS:3600}
+    refresh-token-seconds: ${APP_REFRESH_TOKEN_SECONDS:1209600}
+    google-client-id: ${GOOGLE_CLIENT_ID:local-google-client-id}
+    apple-client-id: ${APPLE_CLIENT_ID:local-apple-client-id}

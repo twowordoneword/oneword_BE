@@ -1,0 +1,43 @@
+package com.example.musing_BE.auth.controller;
+
+import com.example.musing_BE.auth.dto.*;
+import com.example.musing_BE.auth.service.AuthService;
+import com.example.musing_BE.common.response.ApiResponse;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/v1/auth")
+@RequiredArgsConstructor
+public class AuthController {
+    private final AuthService authService;
+
+    @PostMapping("/login")
+    public ApiResponse<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+        return ApiResponse.ok(authService.login(request));
+    }
+
+    @PostMapping("/refresh")
+    public ApiResponse<TokenRefreshResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+        return ApiResponse.ok(authService.refresh(request));
+    }
+
+    @GetMapping("/me")
+    public ApiResponse<UserProfileResponse> me() {
+        return ApiResponse.ok(authService.me());
+    }
+
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout() {
+        authService.logout();
+    }
+
+    @DeleteMapping("/withdraw")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void withdraw() {
+        authService.withdraw();
+    }
+}
