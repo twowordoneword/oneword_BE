@@ -6,6 +6,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -62,6 +64,18 @@ public class GlobalExceptionHandler {
         ErrorCode ec = ErrorCode.DIARY_ALREADY_EXISTS;
         return ResponseEntity.status(ec.getStatus())
                 .body(ApiResponse.fail(ec.getCode(), ec.getMessage()));
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAuth(AuthenticationException e) {
+        ErrorCode ec = ErrorCode.UNAUTHORIZED;
+        return ResponseEntity.status(ec.getStatus()).body(ApiResponse.fail(ec.getCode(), ec.getMessage()));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleForbidden(AccessDeniedException e) {
+        ErrorCode ec = ErrorCode.FORBIDDEN;
+        return ResponseEntity.status(ec.getStatus()).body(ApiResponse.fail(ec.getCode(), ec.getMessage()));
     }
 
     /** 존재하지 않는 경로 → 404 (catch-all이 500으로 만들지 않도록 명시 처리) */

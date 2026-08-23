@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    defer-datasource-initialization: false
+    show-sql: false
+  sql:
+    init:
+      mode: never
+
+app:
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS}
+  auth:
+    jwt-secret: ${APP_JWT_SECRET}
+    access-token-seconds: ${APP_ACCESS_TOKEN_SECONDS}
+    refresh-token-seconds: ${APP_REFRESH_TOKEN_SECONDS}
+    google-client-id: ${GOOGLE_CLIENT_ID}
+    apple-client-id: ${APPLE_CLIENT_ID}

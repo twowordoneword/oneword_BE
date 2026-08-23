@@ -6,10 +6,12 @@ import com.example.musing_BE.diary.domain.Mood;
 import com.example.musing_BE.diary.domain.Weather;
 import com.example.musing_BE.diary.dto.DiaryDetailResponse;
 import com.example.musing_BE.diary.service.DiaryService;
+import com.example.musing_BE.security.JwtAuthenticationFilter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -25,11 +27,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(DiaryController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @DisplayName("DiaryController HTTP 계약 테스트")
 class DiaryControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean DiaryService diaryService;
+    @MockitoBean JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Test
     @DisplayName("정상 작성 → 201 + success:true")

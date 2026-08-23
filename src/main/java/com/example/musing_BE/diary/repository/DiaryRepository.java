@@ -33,6 +33,12 @@ public interface DiaryRepository extends JpaRepository<Diary, Long> {
     /** 특정 기간(월) 일기 수 */
     long countByUserIdAndDiaryDateBetween(Long userId, LocalDate start, LocalDate end);
 
+    @Query("select d.diaryDate from Diary d where d.user.id = :userId order by d.diaryDate desc")
+    List<LocalDate> findDiaryDatesByUserIdOrderByDiaryDateDesc(@Param("userId") Long userId);
+
+    @Query("select d.mood, count(d) from Diary d where d.user.id = :userId group by d.mood order by count(d) desc")
+    List<Object[]> findMoodCountsByUserId(@Param("userId") Long userId);
+
     /** 특정 역할(MY/RECOMMENDED)의 곡이 연결된 일기 수. '음악 등록'은 MY 기준. */
     @Query("select count(distinct dt.diary.id) from DiaryTrack dt "
          + "where dt.diary.user.id = :userId and dt.role = :role")

@@ -11,6 +11,7 @@ import com.example.musing_BE.diary.entity.Diary;
 import com.example.musing_BE.diary.repository.DiaryRepository;
 import com.example.musing_BE.track.entity.Track;
 import com.example.musing_BE.track.repository.TrackRepository;
+import com.example.musing_BE.security.CurrentUserProvider;
 import com.example.musing_BE.user.entity.User;
 import com.example.musing_BE.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,63 +30,66 @@ public class DiaryService {
     private final DiaryRepository diaryRepository;
     private final TrackRepository trackRepository;
     private final UserRepository userRepository;
-
-    // TODO(auth): 인증 슬라이스에서 SecurityContext의 실제 사용자로 대체
-    private static final Long DEV_USER_ID = 1L;
+    private final CurrentUserProvider currentUserProvider;
 
     /** 일기 날짜 기준 타임존 (KST) */
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     /** 월별 기록 조회 (캘린더). month = "YYYY-MM" */
     public MonthlyDiaryResponse getMonthly(String month) {
+        Long userId = currentUserProvider.getCurrentUserId();
         YearMonth ym = YearMonth.parse(month); // 형식 오류 시 DateTimeParseException -> 400
         List<Diary> diaries = diaryRepository.findMonthlyWithTracks(
-                DEV_USER_ID, ym.atDay(1), ym.atEndOfMonth());
+                userId, ym.atDay(1), ym.atEndOfMonth());
         return MonthlyDiaryResponse.of(month, diaries);
     }
 
     /** 특정 날짜 일기 상세 */
     public DiaryDetailResponse getByDate(LocalDate date) {
-        Diary diary = diaryRepository.findByUserIdAndDiaryDate(DEV_USER_ID, date)
+        Long userId = currentUserProvider.getCurrentUserId();
+        Diary diary = diaryRepository.findByUserIdAndDiaryDate(userId, date)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DIARY_NOT_FOUND));
-        return toDetail(diary);
+        return toDetail(userId, diary);
     }
 
     /** 일기 작성 */
     @Transactional
     public DiaryDetailResponse create(DiaryUpsertRequest req) {
+        Long userId = currentUserProvider.getCurrentUserId();
         validateNotFuture(req.date());
-        if (diaryRepository.existsByUserIdAndDiaryDate(DEV_USER_ID, req.date())) {
+        if (diaryRepository.existsByUserIdAndDiaryDate(userId, req.date())) {
             throw new BusinessException(ErrorCode.DIARY_ALREADY_EXISTS);
         }
-        User user = userRepository.findById(DEV_USER_ID)
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Diary diary = Diary.create(user, req.date(), req.title(), req.body(), req.mood(), req.weather());
         attachTracks(diary, req);
-        return toDetail(diaryRepository.save(diary));
+        return toDetail(userId, diaryRepository.save(diary));
     }
 
     /** 일기 수정 (전체 교체) */
     @Transactional
     public DiaryDetailResponse update(LocalDate date, DiaryUpsertRequest req) {
+        Long userId = currentUserProvider.getCurrentUserId();
         if (req.date() != null && !date.equals(req.date())) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR); // 경로 날짜 ≠ 바디 날짜
         }
         validateNotFuture(date);
-        Diary diary = diaryRepository.findByUserIdAndDiaryDate(DEV_USER_ID, date)
+        Diary diary = diaryRepository.findByUserIdAndDiaryDate(userId, date)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DIARY_NOT_FOUND));
         diary.update(req.title(), req.body(), req.mood(), req.weather());
         diary.clearTracks();          // 기존 곡 연결 제거(orphanRemoval)
         diaryRepository.flush();      // DELETE를 INSERT보다 먼저 실행 → uq_diary_role 충돌 방지
         attachTracks(diary, req);     // 새로 설정
-        return toDetail(diary);
+        return toDetail(userId, diary);
     }
 
     /** 일기 삭제 */
     @Transactional
     public void delete(LocalDate date) {
-        Diary diary = diaryRepository.findByUserIdAndDiaryDate(DEV_USER_ID, date)
+        Long userId = currentUserProvider.getCurrentUserId();
+        Diary diary = diaryRepository.findByUserIdAndDiaryDate(userId, date)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DIARY_NOT_FOUND));
         diaryRepository.delete(diary); // diary_tracks는 CASCADE/orphanRemoval로 함께 삭제
     }
@@ -100,8 +104,8 @@ public class DiaryService {
     }
 
     /** 작성 순번(seq)을 계산해 상세 응답으로 변환. */
-    private DiaryDetailResponse toDetail(Diary diary) {
-        long seq = diaryRepository.countSeqUpTo(DEV_USER_ID, diary.getId());
+    private DiaryDetailResponse toDetail(Long userId, Diary diary) {
+        long seq = diaryRepository.countSeqUpTo(userId, diary.getId());
         return DiaryDetailResponse.from(diary, seq);
     }
 
