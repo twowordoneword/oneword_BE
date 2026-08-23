@@ -5,6 +5,7 @@ import com.example.musing_BE.common.exception.ErrorCode;
 
 public enum SocialProvider {
     KAKAO("kakao"),
+    NAVER("naver"),
     GOOGLE("google"),
     APPLE("apple");
 

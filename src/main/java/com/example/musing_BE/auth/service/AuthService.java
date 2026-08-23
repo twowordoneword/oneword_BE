@@ -7,6 +7,8 @@ import com.example.musing_BE.auth.entity.RefreshToken;
 import com.example.musing_BE.auth.repository.RefreshTokenRepository;
 import com.example.musing_BE.common.exception.BusinessException;
 import com.example.musing_BE.common.exception.ErrorCode;
+import com.example.musing_BE.diary.repository.DiaryRepository;
+import com.example.musing_BE.diary.repository.DiaryTrackRepository;
 import com.example.musing_BE.security.CurrentUserProvider;
 import com.example.musing_BE.user.entity.User;
 import com.example.musing_BE.user.repository.UserRepository;
@@ -26,6 +28,8 @@ public class AuthService {
     private final AppJwtService appJwtService;
     private final RefreshTokenHasher refreshTokenHasher;
     private final CurrentUserProvider currentUserProvider;
+    private final DiaryRepository diaryRepository;
+    private final DiaryTrackRepository diaryTrackRepository;
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
@@ -106,6 +110,8 @@ public class AuthService {
     public void withdraw() {
         Long userId = currentUserProvider.getCurrentUserId();
         refreshTokenRepository.deleteByUserId(userId);
+        diaryTrackRepository.deleteByDiaryUserId(userId);
+        diaryRepository.deleteByUserId(userId);
         userRepository.deleteById(userId);
     }
 

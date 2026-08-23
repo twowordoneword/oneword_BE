@@ -35,6 +35,7 @@ public class SocialTokenVerifierImpl implements SocialTokenVerifier {
     public SocialUserInfo verify(SocialProvider provider, String token) {
         return switch (provider) {
             case KAKAO -> verifyKakao(token);
+            case NAVER -> verifyNaver(token);
             case GOOGLE -> verifyGoogle(token);
             case APPLE -> verifyApple(token);
         };
@@ -71,6 +72,32 @@ public class SocialTokenVerifierImpl implements SocialTokenVerifier {
         String email = jwt.getClaimAsString("email");
         String nickname = jwt.getClaimAsString("name");
         return new SocialUserInfo(SocialProvider.GOOGLE, providerId, email, nickname);
+    }
+
+    private SocialUserInfo verifyNaver(String accessToken) {
+        try {
+            NaverUserMeResponse body = restClient.get()
+                    .uri("https://openapi.naver.com/v1/nid/me")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .retrieve()
+                    .body(NaverUserMeResponse.class);
+
+            if (body == null || body.response == null || body.response.id == null || body.response.id.isBlank()) {
+                throw new BusinessException(ErrorCode.INVALID_SOCIAL_TOKEN);
+            }
+
+            return new SocialUserInfo(
+                    SocialProvider.NAVER,
+                    body.response.id,
+                    body.response.email,
+                    body.response.nickname
+            );
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Naver token verify failed: {}", e.getMessage());
+            throw new BusinessException(ErrorCode.INVALID_SOCIAL_TOKEN);
+        }
     }
 
     private SocialUserInfo verifyApple(String idToken) {
@@ -113,6 +140,18 @@ public class SocialTokenVerifierImpl implements SocialTokenVerifier {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class KakaoProfile {
+        public String nickname;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    static class NaverUserMeResponse {
+        public NaverUserResponse response;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    static class NaverUserResponse {
+        public String id;
+        public String email;
         public String nickname;
     }
 }
