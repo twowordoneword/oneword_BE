@@ -44,6 +44,7 @@ class SurveyCollectServiceTest {
         service = new SurveyCollectService(itunesClient, trackCollector);
         ReflectionTestUtils.setField(service, "defaultSongsPerArtist", 10);
         ReflectionTestUtils.setField(service, "requestDelayMs", 0L);   // 테스트에서는 대기 없음
+        given(trackCollector.upsertAll(any(), any())).willReturn(new TrackCollector.Counts(0, 0, 0));
     }
 
     private CollectedTrack track(String name, String artist, String preview, String album) {
