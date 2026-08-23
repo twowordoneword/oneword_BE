@@ -1,8 +1,7 @@
 name: Claude Code Review
 
 on:
-  pull_request:
-    types: [opened, synchronize]
+  workflow_dispatch:
 
 # 같은 PR에 연속으로 푸시하면 진행 중이던 리뷰는 취소한다 (사용량 절약)
 concurrency:
