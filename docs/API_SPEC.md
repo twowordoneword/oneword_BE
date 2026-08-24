@@ -91,11 +91,14 @@ Spring Boot 백엔드(`musing_BE`)용 REST API 명세. 프론트(Flutter) 핸드
 |---|---|---|---|
 | `google` | id_token | 불필요 | 토큰 서명 + `aud` = 우리 client id |
 | `apple` | id_token | 불필요 | 토큰 서명 + `aud` = 우리 client id |
-| `kakao` | access_token | 불필요 | access_token_info의 `app_id` = 우리 앱 id |
+| `kakao` | id_token (OIDC) | 불필요 | 토큰 서명 + `aud` = 우리 앱 키 |
 | `naver` | **인가 코드(authorization code)** | **필수** | 우리 client_id/secret으로 코드를 직접 교환 |
 
-> **네이버가 access_token이 아니라 인가 코드인 이유:** 네이버에는 "이 토큰이 우리 앱에 발급된
-> 것인가"를 확인해 주는 API가 없습니다. 액세스 토큰을 그대로 받으면 제3자가 자기 앱으로 모은
+> **카카오는 OIDC id_token입니다** — access_token이 아닙니다. Flutter SDK의 `OAuthToken.idToken`을
+> 그대로 보내면 됩니다. 이걸 쓰려면 Kakao Developers 콘솔에서 **OpenID Connect 활성화**가 필요합니다.
+
+> **네이버만 인가 코드인 이유:** 네이버는 OIDC를 제공하지 않고, "이 토큰이 우리 앱에 발급된
+> 것인가"를 확인해 주는 API도 없습니다. 액세스 토큰을 그대로 받으면 제3자가 자기 앱으로 모은
 > 토큰을 우리 로그인에 던져 남의 계정이 될 수 있습니다(토큰 치환). 인가 코드를 받아 서버가
 > client_secret으로 직접 교환하면, 교환에 성공했다는 사실 자체가 우리 앱 발급 증거가 됩니다.
 > 프론트는 네이버 로그인 콜백에서 받은 `code`와 `state`를 그대로 보내면 됩니다.

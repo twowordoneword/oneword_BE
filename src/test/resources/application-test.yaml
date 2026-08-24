@@ -28,7 +28,7 @@ app:
     refresh-token-seconds: ${APP_REFRESH_TOKEN_SECONDS:1209600}
     google-client-id: ${GOOGLE_CLIENT_ID:test-google-client-id}
     apple-client-id: ${APPLE_CLIENT_ID:test-apple-client-id}
-    kakao-app-id: ${KAKAO_APP_ID:test-kakao-app-id}
+    kakao-client-id: ${KAKAO_CLIENT_ID:test-kakao-client-id}
     naver-client-id: ${NAVER_CLIENT_ID:test-naver-client-id}
     naver-client-secret: ${NAVER_CLIENT_SECRET:test-naver-client-secret}
 

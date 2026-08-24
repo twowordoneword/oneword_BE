@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "app.auth.refresh-token-seconds=1209600",
         "app.auth.google-client-id=test-google-client-id",
         "app.auth.apple-client-id=test-apple-client-id",
-        "app.auth.kakao-app-id=test-kakao-app-id",
+        "app.auth.kakao-client-id=test-kakao-client-id",
         "app.auth.naver-client-id=test-naver-client-id",
         "app.auth.naver-client-secret=test-naver-client-secret"
 })

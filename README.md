@@ -23,7 +23,7 @@ APP_ACCESS_TOKEN_SECONDS=3600 \
 APP_REFRESH_TOKEN_SECONDS=1209600 \
 GOOGLE_CLIENT_ID=... \
 APPLE_CLIENT_ID=... \
-KAKAO_APP_ID=... \
+KAKAO_CLIENT_ID=... \
 NAVER_CLIENT_ID=... \
 NAVER_CLIENT_SECRET=... \
 ./gradlew bootRun
@@ -37,11 +37,18 @@ NAVER_CLIENT_SECRET=... \
 | `APP_JWT_SECRET` | 자체 JWT 서명 키. **32바이트 이상**, 절대 커밋 금지 |
 | `APP_ACCESS_TOKEN_SECONDS` | 액세스 토큰 수명(초) |
 | `APP_REFRESH_TOKEN_SECONDS` | 리프레시 토큰 수명(초) |
-| `GOOGLE_CLIENT_ID` / `APPLE_CLIENT_ID` | id_token의 `aud` 검증값 |
-| `KAKAO_APP_ID` | 카카오 access_token_info의 `app_id` 검증값 |
+| `GOOGLE_CLIENT_ID` / `APPLE_CLIENT_ID` / `KAKAO_CLIENT_ID` | id_token의 `aud` 검증값. **콤마로 여러 개 등록 가능** |
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | 네이버 인가 코드 교환용 |
 
-> 뒤 네 줄은 **"우리 앱에 발급된 소셜 자격증명인가"를 확인하는 값**입니다. 비워 두면 해당
+> 플랫폼마다 client id가 달라 `aud`도 달라집니다. 애플은 iOS 네이티브 로그인이면 앱의
+> **Bundle ID**, 웹·안드로이드면 **Services ID**이고, 구글은 Flutter에서 `serverClientId`를
+> 지정하면 **웹 클라이언트 ID**가 `aud`가 됩니다. 여러 플랫폼을 지원하면 콤마로 나열하세요.
+>
+> ```
+> APPLE_CLIENT_ID=com.musing.app,com.musing.web
+> ```
+>
+> 뒤 세 줄은 **"우리 앱에 발급된 소셜 자격증명인가"를 확인하는 값**입니다. 비워 두면 해당
 > 제공자 로그인이 500으로 거부됩니다 — 검증 없이 통과시키면 제3자가 자기 앱에서 모은 토큰으로
 > 남의 계정에 로그인할 수 있기 때문에, 설정 누락은 조용히 넘기지 않고 실패시킵니다.
 
