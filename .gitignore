@@ -35,3 +35,8 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### 로컬 시크릿 ###
+.env
+.env.local
+!.env.example
