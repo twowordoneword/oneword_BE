@@ -36,6 +36,20 @@ class DiaryControllerTest {
     @MockitoBean JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Test
+    @DisplayName("곡 이름이 DB 컬럼 한도를 넘으면 400 + VALIDATION_ERROR")
+    void 곡이름_길이초과_400() throws Exception {
+        String body = """
+                {"date":"2026-07-21","title":"제목","body":"본문","mood":"평온","weather":"바람",
+                 "myTrack":{"name":"%s","artist":"아이유"}}
+                """.formatted("가".repeat(256));
+
+        mvc.perform(post("/api/v1/diaries").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
     @DisplayName("정상 작성 → 201 + success:true")
     void 작성_성공_201() throws Exception {
         DiaryDetailResponse resp = new DiaryDetailResponse(

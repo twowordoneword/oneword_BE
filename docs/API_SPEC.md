@@ -58,13 +58,15 @@ Spring Boot 백엔드(`musing_BE`)용 REST API 명세. 프론트(Flutter) 핸드
 ```jsonc
 {
   "id": 12,                  // 서버 저장 후 부여(검색 결과 단계에선 null 가능)
-  "name": "밤편지",           // 필수
-  "artist": "아이유",         // 필수
-  "album": "밤편지",          // nullable
-  "artworkUrl": "https://...600x600.jpg", // nullable
-  "previewUrl": "https://...preview.m4a"  // nullable
+  "name": "밤편지",           // 필수, 최대 255자
+  "artist": "아이유",         // 필수, 최대 255자
+  "album": "밤편지",          // nullable, 최대 255자
+  "artworkUrl": "https://...600x600.jpg", // nullable, 최대 500자
+  "previewUrl": "https://...preview.m4a"  // nullable, 최대 500자
 }
 ```
+
+> 길이 제한은 DB 컬럼과 같습니다. 넘으면 저장 전에 `VALIDATION_ERROR`(400)로 거절합니다.
 
 ---
 
@@ -265,6 +267,11 @@ Spring Boot 백엔드(`musing_BE`)용 REST API 명세. 프론트(Flutter) 핸드
 
 ### 4.1 곡 검색 (iTunes 프록시)
 `GET /api/v1/tracks/search?q={검색어}&limit=20`  · 인증 필요
+
+| 파라미터 | 제약 |
+|---|---|
+| `q` | 필수, 공백만 있으면 안 됨, 최대 100자 — 위반 시 `VALIDATION_ERROR`(400) |
+| `limit` | 선택(기본 20). 1~50 범위를 벗어나면 서버가 잘라서 처리 |
 
 **Response 200**
 ```jsonc

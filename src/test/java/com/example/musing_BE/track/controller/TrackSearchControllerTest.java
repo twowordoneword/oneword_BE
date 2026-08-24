@@ -69,6 +69,27 @@ class TrackSearchControllerTest {
     }
 
     @Test
+    @DisplayName("검색어가 비어 있으면 400 + VALIDATION_ERROR")
+    void returns400WhenQueryBlank() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+
+        mvc.perform(get("/api/v1/tracks/search").param("q", "   "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("검색어가 지나치게 길면 400 + VALIDATION_ERROR")
+    void returns400WhenQueryTooLong() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+
+        mvc.perform(get("/api/v1/tracks/search").param("q", "가".repeat(101)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
     @DisplayName("요청 한도 초과 시 429 + RATE_LIMIT_EXCEEDED")
     void returns429WhenRateLimitExceeded() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
