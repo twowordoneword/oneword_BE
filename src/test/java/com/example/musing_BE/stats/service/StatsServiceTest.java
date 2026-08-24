@@ -2,6 +2,7 @@ package com.example.musing_BE.stats.service;
 
 import com.example.musing_BE.diary.domain.Mood;
 import com.example.musing_BE.diary.repository.DiaryRepository;
+import com.example.musing_BE.diary.repository.DiaryTrackRepository;
 import com.example.musing_BE.security.CurrentUserProvider;
 import com.example.musing_BE.stats.dto.StatsResponse;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +27,8 @@ class StatsServiceTest {
     @Mock
     DiaryRepository diaryRepository;
     @Mock
+    DiaryTrackRepository diaryTrackRepository;
+    @Mock
     CurrentUserProvider currentUserProvider;
 
     @Test
@@ -34,11 +37,10 @@ class StatsServiceTest {
         Long userId = 1L;
         Clock clock = Clock.fixed(Instant.parse("2026-08-20T15:00:00Z"), ZoneId.of("Asia/Seoul"));
         LocalDate today = LocalDate.now(clock);
-        StatsService statsService = new StatsService(diaryRepository, currentUserProvider, clock);
+        StatsService statsService = new StatsService(diaryRepository, diaryTrackRepository, currentUserProvider, clock);
         given(currentUserProvider.getCurrentUserId()).willReturn(userId);
         given(diaryRepository.countByUserId(userId)).willReturn(10L);
-        given(diaryRepository.countDiariesWithRole(userId, com.example.musing_BE.diary.domain.TrackRole.MY))
-                .willReturn(8L);
+        given(diaryTrackRepository.countByDiaryUserId(userId)).willReturn(8L);
         given(diaryRepository.existsByUserIdAndDiaryDate(userId, today)).willReturn(true);
         given(diaryRepository.findDiaryDatesByUserIdOrderByDiaryDateDesc(userId))
                 .willReturn(List.of(today, today.minusDays(1), today.minusDays(2), today.minusDays(4)));
@@ -60,11 +62,10 @@ class StatsServiceTest {
         Long userId = 2L;
         Clock clock = Clock.fixed(Instant.parse("2026-08-20T15:00:00Z"), ZoneId.of("Asia/Seoul"));
         LocalDate today = LocalDate.now(clock);
-        StatsService statsService = new StatsService(diaryRepository, currentUserProvider, clock);
+        StatsService statsService = new StatsService(diaryRepository, diaryTrackRepository, currentUserProvider, clock);
         given(currentUserProvider.getCurrentUserId()).willReturn(userId);
         given(diaryRepository.countByUserId(userId)).willReturn(2L);
-        given(diaryRepository.countDiariesWithRole(userId, com.example.musing_BE.diary.domain.TrackRole.MY))
-                .willReturn(1L);
+        given(diaryTrackRepository.countByDiaryUserId(userId)).willReturn(1L);
         given(diaryRepository.existsByUserIdAndDiaryDate(userId, today)).willReturn(false);
         given(diaryRepository.findDiaryDatesByUserIdOrderByDiaryDateDesc(userId))
                 .willReturn(List.of(today.minusDays(3), today.minusDays(4)));
@@ -83,12 +84,11 @@ class StatsServiceTest {
         Long userId = 3L;
         Clock clock = Clock.fixed(Instant.parse("2026-08-20T15:00:00Z"), ZoneId.of("Asia/Seoul"));
         LocalDate today = LocalDate.now(clock);
-        StatsService statsService = new StatsService(diaryRepository, currentUserProvider, clock);
+        StatsService statsService = new StatsService(diaryRepository, diaryTrackRepository, currentUserProvider, clock);
 
         given(currentUserProvider.getCurrentUserId()).willReturn(userId);
         given(diaryRepository.countByUserId(userId)).willReturn(4L);
-        given(diaryRepository.countDiariesWithRole(userId, com.example.musing_BE.diary.domain.TrackRole.MY))
-                .willReturn(0L);
+        given(diaryTrackRepository.countByDiaryUserId(userId)).willReturn(0L);
         given(diaryRepository.existsByUserIdAndDiaryDate(userId, today)).willReturn(false);
         given(diaryRepository.findDiaryDatesByUserIdOrderByDiaryDateDesc(userId)).willReturn(List.of());
         given(diaryRepository.findMoodCountsByUserId(userId))
@@ -105,12 +105,11 @@ class StatsServiceTest {
         Long userId = 4L;
         Clock clock = Clock.fixed(Instant.parse("2026-08-31T15:00:00Z"), ZoneId.of("Asia/Seoul")); // 2026-09-01 KST
         LocalDate today = LocalDate.now(clock);
-        StatsService statsService = new StatsService(diaryRepository, currentUserProvider, clock);
+        StatsService statsService = new StatsService(diaryRepository, diaryTrackRepository, currentUserProvider, clock);
 
         given(currentUserProvider.getCurrentUserId()).willReturn(userId);
         given(diaryRepository.countByUserId(userId)).willReturn(3L);
-        given(diaryRepository.countDiariesWithRole(userId, com.example.musing_BE.diary.domain.TrackRole.MY))
-                .willReturn(0L);
+        given(diaryTrackRepository.countByDiaryUserId(userId)).willReturn(0L);
         given(diaryRepository.existsByUserIdAndDiaryDate(userId, today)).willReturn(true);
         given(diaryRepository.findDiaryDatesByUserIdOrderByDiaryDateDesc(userId))
                 .willReturn(List.of(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 8, 31), LocalDate.of(2026, 8, 30)));
@@ -127,12 +126,11 @@ class StatsServiceTest {
         Long userId = 5L;
         Clock clock = Clock.fixed(Instant.parse("2026-08-31T15:30:00Z"), ZoneId.of("Asia/Seoul")); // 2026-09-01 00:30 KST
         LocalDate kstToday = LocalDate.of(2026, 9, 1);
-        StatsService statsService = new StatsService(diaryRepository, currentUserProvider, clock);
+        StatsService statsService = new StatsService(diaryRepository, diaryTrackRepository, currentUserProvider, clock);
 
         given(currentUserProvider.getCurrentUserId()).willReturn(userId);
         given(diaryRepository.countByUserId(userId)).willReturn(0L);
-        given(diaryRepository.countDiariesWithRole(userId, com.example.musing_BE.diary.domain.TrackRole.MY))
-                .willReturn(0L);
+        given(diaryTrackRepository.countByDiaryUserId(userId)).willReturn(0L);
         given(diaryRepository.existsByUserIdAndDiaryDate(userId, kstToday)).willReturn(true);
         given(diaryRepository.findDiaryDatesByUserIdOrderByDiaryDateDesc(userId)).willReturn(List.of());
         given(diaryRepository.findMoodCountsByUserId(userId)).willReturn(List.of());

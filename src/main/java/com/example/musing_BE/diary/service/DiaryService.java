@@ -8,7 +8,11 @@ import com.example.musing_BE.diary.dto.DiaryUpsertRequest;
 import com.example.musing_BE.diary.dto.MonthlyDiaryResponse;
 import com.example.musing_BE.diary.dto.TrackDto;
 import com.example.musing_BE.diary.entity.Diary;
+import com.example.musing_BE.diary.domain.ArchiveCursor;
+import com.example.musing_BE.diary.dto.DiaryTrackArchiveResponse;
+import com.example.musing_BE.diary.entity.DiaryTrack;
 import com.example.musing_BE.diary.repository.DiaryRepository;
+import com.example.musing_BE.diary.repository.DiaryTrackRepository;
 import com.example.musing_BE.track.entity.Track;
 import com.example.musing_BE.track.repository.TrackRepository;
 import com.example.musing_BE.track.service.TrackResolver;
@@ -17,6 +21,7 @@ import com.example.musing_BE.user.entity.User;
 import com.example.musing_BE.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
@@ -30,6 +35,7 @@ import java.util.List;
 public class DiaryService {
 
     private final DiaryRepository diaryRepository;
+    private final DiaryTrackRepository diaryTrackRepository;
     private final TrackRepository trackRepository;
     private final TrackResolver trackResolver;
     private final UserRepository userRepository;
@@ -45,6 +51,33 @@ public class DiaryService {
         List<Diary> diaries = diaryRepository.findMonthlyWithTracks(
                 userId, ym.atDay(1), ym.atEndOfMonth());
         return MonthlyDiaryResponse.of(month, diaries);
+    }
+
+    /**
+     * 음악 아카이브 — 기록에 담긴 곡을 최신순으로.
+     *
+     * <p>다음 페이지가 있는지 알려면 요청한 개수보다 <b>하나 더</b> 읽어 본다.
+     * 전체 개수를 세는 count 쿼리보다 싸고, 목록이 커져도 비용이 일정하다.
+     */
+    public DiaryTrackArchiveResponse getTrackArchive(String rawCursor, int limit) {
+        Long userId = currentUserProvider.getCurrentUserId();
+        ArchiveCursor cursor = ArchiveCursor.parse(rawCursor);
+        PageRequest page = PageRequest.of(0, limit + 1);
+
+        List<DiaryTrack> found = cursor == null
+                ? diaryTrackRepository.findArchiveFirstPage(userId, page)
+                : diaryTrackRepository.findArchiveAfter(userId, cursor.date(), cursor.diaryTrackId(), page);
+
+        boolean hasNext = found.size() > limit;
+        List<DiaryTrack> items = hasNext ? found.subList(0, limit) : found;
+        String nextCursor = hasNext
+                ? new ArchiveCursor(items.getLast().getDiary().getDiaryDate(), items.getLast().getId()).format()
+                : null;
+
+        return new DiaryTrackArchiveResponse(
+                items.stream().map(DiaryTrackArchiveResponse.Item::from).toList(),
+                nextCursor
+        );
     }
 
     /** 특정 날짜 일기 상세 */
