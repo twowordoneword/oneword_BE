@@ -20,6 +20,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 /**
  * 소셜 자격증명 검증.
@@ -167,8 +168,10 @@ public class SocialTokenVerifierImpl implements SocialTokenVerifier {
         }
     }
 
-    private void validateAudience(Jwt jwt, String expectedAudience) {
-        if (jwt.getAudience() == null || jwt.getAudience().stream().noneMatch(expectedAudience::equals)) {
+    /** 플랫폼마다 client id가 달라 aud도 달라진다. 등록된 것 중 하나라도 맞으면 통과. */
+    private void validateAudience(Jwt jwt, List<String> expectedAudiences) {
+        List<String> audience = jwt.getAudience();
+        if (audience == null || expectedAudiences.stream().noneMatch(audience::contains)) {
             throw new BusinessException(ErrorCode.INVALID_SOCIAL_TOKEN);
         }
     }
@@ -180,6 +183,18 @@ public class SocialTokenVerifierImpl implements SocialTokenVerifier {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
         return value.trim();
+    }
+
+    private List<String> requireConfigured(List<String> values, String propertyName) {
+        List<String> configured = values == null ? List.of() : values.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .map(String::trim)
+                .toList();
+        if (configured.isEmpty()) {
+            log.error("필수 설정이 비어 있습니다: {}", propertyName);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+        }
+        return configured;
     }
 
     /** 첫 호출에서 한 번만 디스커버리하고 결과를 재사용한다. */
