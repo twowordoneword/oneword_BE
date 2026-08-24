@@ -23,7 +23,7 @@ APP_ACCESS_TOKEN_SECONDS=3600 \
 APP_REFRESH_TOKEN_SECONDS=1209600 \
 GOOGLE_CLIENT_ID=... \
 APPLE_CLIENT_ID=... \
-KAKAO_APP_ID=... \
+KAKAO_CLIENT_ID=... \
 NAVER_CLIENT_ID=... \
 NAVER_CLIENT_SECRET=... \
 ./gradlew bootRun
@@ -37,8 +37,7 @@ NAVER_CLIENT_SECRET=... \
 | `APP_JWT_SECRET` | 자체 JWT 서명 키. **32바이트 이상**, 절대 커밋 금지 |
 | `APP_ACCESS_TOKEN_SECONDS` | 액세스 토큰 수명(초) |
 | `APP_REFRESH_TOKEN_SECONDS` | 리프레시 토큰 수명(초) |
-| `GOOGLE_CLIENT_ID` / `APPLE_CLIENT_ID` | id_token의 `aud` 검증값 |
-| `KAKAO_APP_ID` | 카카오 access_token_info의 `app_id` 검증값 |
+| `GOOGLE_CLIENT_ID` / `APPLE_CLIENT_ID` / `KAKAO_CLIENT_ID` | id_token의 `aud` 검증값 (카카오는 앱 키) |
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | 네이버 인가 코드 교환용 |
 
 > 뒤 네 줄은 **"우리 앱에 발급된 소셜 자격증명인가"를 확인하는 값**입니다. 비워 두면 해당

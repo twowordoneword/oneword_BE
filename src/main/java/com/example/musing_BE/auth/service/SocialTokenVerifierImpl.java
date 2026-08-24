@@ -28,17 +28,14 @@ import java.nio.charset.StandardCharsets;
  * 이 확인이 없으면 제3자가 자기 앱으로 모은 토큰을 그대로 우리 로그인에 던져
  * 남의 계정이 될 수 있다(토큰 치환 공격).
  * <ul>
- *   <li>구글·애플 — id_token의 {@code aud}가 우리 client id인지</li>
- *   <li>카카오 — access_token_info의 {@code app_id}가 우리 앱 id인지</li>
- *   <li>네이버 — 검증용 API가 없어, 인가 코드를 우리 client_id/secret으로 직접 교환한다</li>
+ *   <li>구글·애플·카카오 — id_token의 {@code aud}가 우리 client id인지</li>
+ *   <li>네이버 — OIDC를 제공하지 않아, 인가 코드를 우리 client_id/secret으로 직접 교환한다</li>
  * </ul>
  */
 @Slf4j
 @Component
 public class SocialTokenVerifierImpl implements SocialTokenVerifier {
 
-    private static final String KAKAO_TOKEN_INFO_URL = "https://kapi.kakao.com/v1/user/access_token_info";
-    private static final String KAKAO_USER_ME_URL = "https://kapi.kakao.com/v2/user/me";
     private static final String NAVER_TOKEN_URL = "https://nid.naver.com/oauth2.0/token";
     private static final String NAVER_USER_ME_URL = "https://openapi.naver.com/v1/nid/me";
 
@@ -47,11 +44,12 @@ public class SocialTokenVerifierImpl implements SocialTokenVerifier {
 
     /**
      * OIDC 디스커버리는 네트워크를 타므로 <b>첫 사용 시점까지 미룬다.</b>
-     * 생성자에서 받아오면 구글/애플이 잠깐 불안정하거나 오프라인일 때 앱이 아예 뜨지 않고,
+     * 생성자에서 받아오면 제공자 쪽이 잠깐 불안정하거나 오프라인일 때 앱이 아예 뜨지 않고,
      * 소셜 로그인을 쓰지 않는 테스트 컨텍스트도 매번 외부 호출을 하게 된다.
      */
     private final LazyJwtDecoder googleDecoder = new LazyJwtDecoder("https://accounts.google.com");
     private final LazyJwtDecoder appleDecoder = new LazyJwtDecoder("https://appleid.apple.com");
+    private final LazyJwtDecoder kakaoDecoder = new LazyJwtDecoder("https://kauth.kakao.com");
 
     public SocialTokenVerifierImpl(AuthProperties authProperties) {
         this.authProperties = authProperties;
@@ -68,41 +66,22 @@ public class SocialTokenVerifierImpl implements SocialTokenVerifier {
         };
     }
 
-    private SocialUserInfo verifyKakao(String accessToken) {
-        String expectedAppId = requireConfigured(authProperties.kakaoAppId(), "app.auth.kakao-app-id");
-        try {
-            KakaoTokenInfoResponse tokenInfo = restClient.get()
-                    .uri(KAKAO_TOKEN_INFO_URL)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .retrieve()
-                    .body(KakaoTokenInfoResponse.class);
-
-            if (tokenInfo == null || tokenInfo.appId == null
-                    || !expectedAppId.equals(String.valueOf(tokenInfo.appId))) {
-                log.warn("Kakao token issued for another app (appId={})", tokenInfo == null ? null : tokenInfo.appId);
-                throw new BusinessException(ErrorCode.INVALID_SOCIAL_TOKEN);
-            }
-
-            KakaoUserMeResponse body = restClient.get()
-                    .uri(KAKAO_USER_ME_URL)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                    .retrieve()
-                    .body(KakaoUserMeResponse.class);
-
-            if (body == null || body.id == null) {
-                throw new BusinessException(ErrorCode.INVALID_SOCIAL_TOKEN);
-            }
-            String email = body.kakaoAccount != null ? body.kakaoAccount.email : null;
-            String nickname = body.kakaoAccount != null && body.kakaoAccount.profile != null
-                    ? body.kakaoAccount.profile.nickname : null;
-
-            return new SocialUserInfo(SocialProvider.KAKAO, String.valueOf(body.id), email, nickname);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.warn("Kakao token verify failed: {}", e.getMessage());
-            throw new BusinessException(ErrorCode.INVALID_SOCIAL_TOKEN);
-        }
+    /**
+     * 카카오도 OpenID Connect를 지원하므로 구글·애플과 같은 방식으로 검증한다.
+     *
+     * <p>이전에는 access_token을 받아 {@code /v2/user/me}로 조회하고 {@code access_token_info}의
+     * {@code app_id}를 대조했는데, 프론트(카카오 SDK)가 보내는 것은 OIDC id_token이라 서로 맞지 않았다.
+     * id_token 검증으로 바꾸면 서명과 {@code aud}만으로 앱 바인딩이 증명되므로 추가 호출도 사라진다.
+     */
+    private SocialUserInfo verifyKakao(String idToken) {
+        Jwt jwt = decodeJwt(kakaoDecoder, idToken);
+        validateAudience(jwt, requireConfigured(authProperties.kakaoClientId(), "app.auth.kakao-client-id"));
+        return new SocialUserInfo(
+                SocialProvider.KAKAO,
+                jwt.getSubject(),
+                jwt.getClaimAsString("email"),
+                jwt.getClaimAsString("nickname")
+        );
     }
 
     /**
@@ -229,31 +208,6 @@ public class SocialTokenVerifierImpl implements SocialTokenVerifier {
                 return delegate;
             }
         }
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class KakaoTokenInfoResponse {
-        public Long id;
-        @JsonProperty("app_id")
-        public Long appId;
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class KakaoUserMeResponse {
-        public Long id;
-        @JsonProperty("kakao_account")
-        public KakaoAccount kakaoAccount;
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class KakaoAccount {
-        public String email;
-        public KakaoProfile profile;
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class KakaoProfile {
-        public String nickname;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
