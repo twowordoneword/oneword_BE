@@ -21,8 +21,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
 
@@ -333,7 +333,6 @@ class AuthIntegrationTest {
         if (first.getResponse().getStatus() == 201) {
             return;
         }
-
         if (first.getResponse().getStatus() == 500
                 && first.getResponse().getContentAsString().contains("\"INTERNAL_ERROR\"")) {
             MvcResult second = mvc.perform(post("/api/v1/diaries")
@@ -352,7 +351,6 @@ class AuthIntegrationTest {
                     .isEqualTo(201);
             return;
         }
-
         fail("diary create failed. status=%s body=%s", first.getResponse().getStatus(), first.getResponse().getContentAsString());
     }
 
