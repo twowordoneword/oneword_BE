@@ -1,9 +1,10 @@
 package com.example.musing_BE.auth.controller;
 
-import com.example.musing_BE.auth.domain.SocialProvider;
+import com.example.musing_BE.auth.domain.SocialLoginCommand;
 import com.example.musing_BE.auth.domain.SocialUserInfo;
 import com.example.musing_BE.auth.repository.RefreshTokenRepository;
 import com.example.musing_BE.auth.service.RefreshTokenHasher;
+import com.example.musing_BE.auth.service.RefreshTokenStore;
 import com.example.musing_BE.auth.service.SocialTokenVerifier;
 import com.example.musing_BE.common.exception.BusinessException;
 import com.example.musing_BE.common.exception.ErrorCode;
@@ -26,11 +27,12 @@ import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -58,18 +60,21 @@ class AuthIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        given(socialTokenVerifier.verify(any(SocialProvider.class), anyString()))
+        given(socialTokenVerifier.verify(any(SocialLoginCommand.class)))
                 .willAnswer(invocation -> {
-                    SocialProvider provider = invocation.getArgument(0, SocialProvider.class);
-                    String token = invocation.getArgument(1, String.class);
-                    if (INVALID_SOCIAL_TOKEN.equals(token)) {
+                    SocialLoginCommand command = invocation.getArgument(0, SocialLoginCommand.class);
+                    if (INVALID_SOCIAL_TOKEN.equals(command.credential())) {
                         throw new BusinessException(ErrorCode.INVALID_SOCIAL_TOKEN);
                     }
-                    String providerId = token.replace("token-", "");
+                    String providerId = command.credential().replace("token-", "");
+                    // "shared-"로 시작하면 제공자가 달라도 같은 이메일을 돌려준다(계정 분리 검증용).
+                    String email = providerId.startsWith("shared-")
+                            ? "shared@musing.app"
+                            : providerId + "@musing.app";
                     return new SocialUserInfo(
-                            provider,
+                            command.provider(),
                             providerId,
-                            providerId + "@musing.app",
+                            email,
                             "social-" + providerId
                     );
                 });
@@ -216,6 +221,76 @@ class AuthIntegrationTest {
         assertThat(diaryRepository.countByUserId(tokens.userId())).isZero();
         assertThat(diaryTrackRepository.countByDiaryUserId(tokens.userId())).isZero();
         assertThat(refreshTokenRepository.countByUserId(tokens.userId())).isZero();
+    }
+
+    @Test
+    @DisplayName("프리플라이트(OPTIONS)는 인증 없이 통과하고 CORS 헤더를 돌려준다")
+    void preflightPassesWithoutAuthentication() throws Exception {
+        mvc.perform(options("/api/v1/diaries")
+                        .header("Origin", "http://localhost:3000")
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
+    }
+
+    @Test
+    @DisplayName("같은 이메일이라도 제공자가 다르면 별도 계정으로 가입된다")
+    void sameEmailOnDifferentProvidersCreatesSeparateAccounts() throws Exception {
+        LoginTokens kakao = login("shared-kakao", null, "kakao");
+        LoginTokens google = login("shared-google", null, "google");
+
+        assertThat(google.userId()).isNotEqualTo(kakao.userId());
+        assertThat(userRepository.findById(kakao.userId())).isPresent();
+        assertThat(userRepository.findById(google.userId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("refreshToken을 지정해 로그아웃하면 그 세션만 끊기고 다른 기기는 유지된다")
+    void logoutWithRefreshTokenRevokesOnlyThatSession() throws Exception {
+        LoginTokens phone = login("multi-device", null, "kakao");
+        LoginTokens tablet = login("multi-device", null, "kakao");
+        assertThat(tablet.userId()).isEqualTo(phone.userId());
+
+        mvc.perform(post("/api/v1/auth/logout")
+                        .header("Authorization", bearer(phone.accessToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"%s"}
+                                """.formatted(phone.refreshToken())))
+                .andExpect(status().isNoContent());
+
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"%s"}
+                                """.formatted(phone.refreshToken())))
+                .andExpect(status().isUnauthorized());
+
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"%s"}
+                                """.formatted(tablet.refreshToken())))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("리프레시 토큰은 사용자당 상한까지만 쌓이고 오래된 것부터 밀려난다")
+    void refreshTokensAreCappedPerUser() throws Exception {
+        LoginTokens first = login("cap-user", null, "kakao");
+        for (int i = 0; i < RefreshTokenStore.MAX_ACTIVE_PER_USER; i++) {
+            login("cap-user", null, "kakao");
+        }
+
+        assertThat(refreshTokenRepository.countByUserId(first.userId()))
+                .isEqualTo(RefreshTokenStore.MAX_ACTIVE_PER_USER);
+        // 가장 먼저 발급된 토큰은 밀려나 더 이상 쓸 수 없다.
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"%s"}
+                                """.formatted(first.refreshToken())))
+                .andExpect(status().isUnauthorized());
     }
 
     private LoginTokens login(String tokenSuffix, String nickname, String provider) throws Exception {

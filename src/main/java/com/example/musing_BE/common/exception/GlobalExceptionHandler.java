@@ -57,13 +57,35 @@ public class GlobalExceptionHandler {
         return badRequest(ErrorCode.VALIDATION_ERROR.getMessage());
     }
 
-    /** DB 제약 위반(동시 저장 레이스 등) → 409. 대개 하루 1개(diary) 유니크 위반. */
+    /**
+     * DB 제약 위반(동시 저장 레이스 등) → 409.
+     *
+     * <p>어긴 제약이 무엇인지 보고 코드를 고른다. 예전에는 모든 위반을 일기 중복으로 응답해서,
+     * 예컨대 로그인 동시 요청이 사용자 유니크 제약에 걸렸을 때도
+     * "이미 해당 날짜의 일기가 있습니다"라는 엉뚱한 메시지가 나갔다.
+     */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleConflict(DataIntegrityViolationException e) {
         log.warn("Data integrity violation: {}", e.getMessage());
-        ErrorCode ec = ErrorCode.DIARY_ALREADY_EXISTS;
+        ErrorCode ec = violates(e, "uq_diaries_user_date")
+                ? ErrorCode.DIARY_ALREADY_EXISTS
+                : ErrorCode.DATA_CONFLICT;
         return ResponseEntity.status(ec.getStatus())
                 .body(ApiResponse.fail(ec.getCode(), ec.getMessage()));
+    }
+
+    /** 제약 이름은 드라이버 예외 메시지에만 들어 있어 원인 체인을 따라 내려가며 찾는다. */
+    private boolean violates(Throwable e, String constraintName) {
+        String needle = constraintName.toLowerCase();
+        Throwable cause = e;
+        for (int depth = 0; cause != null && depth < 10; depth++) {
+            String message = cause.getMessage();
+            if (message != null && message.toLowerCase().contains(needle)) {
+                return true;
+            }
+            cause = cause.getCause() == cause ? null : cause.getCause();
+        }
+        return false;
     }
 
     @ExceptionHandler(AuthenticationException.class)

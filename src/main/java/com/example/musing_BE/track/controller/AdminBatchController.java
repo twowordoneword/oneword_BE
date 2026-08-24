@@ -24,7 +24,13 @@ import java.security.MessageDigest;
 /**
  * 배치 수동 트리거.
  * <p>용도: 개발 중 즉시 실행 + <b>배포 직후 운영 DB 초기 적재</b>(로컬 배치는 로컬 DB만 채우므로).
- * <p>⚠️ 인증 체계가 아직 없어 공유 토큰 헤더로 보호한다. 인증 도입 후 관리자 권한 검사로 교체할 것.
+ *
+ * <p>이 엔드포인트는 사용자 세션이 없는 곳(운영 스크립트·수동 호출)에서 부르므로 사용자 JWT를
+ * 요구하지 않는다({@code SecurityConfig}에서 {@code /api/v1/admin/**}를 permitAll).
+ * 보호는 아래 {@code X-Admin-Token} 공유 토큰이 단독으로 맡으며, 토큰이 설정돼 있지 않으면
+ * 항상 거부한다.
+ *
+ * <p>관리자 역할(role) 개념이 생기면 공유 토큰 대신 권한 검사로 바꿀 것.
  */
 @RestController
 @RequestMapping("/api/v1/admin/batch")

@@ -37,7 +37,10 @@ Spring Boot 백엔드(`musing_BE`)용 REST API 명세. 프론트(Flutter) 핸드
 
 ### 0.3 공통 에러 코드
 
-`INVALID_TOKEN`, `TOKEN_EXPIRED`, `VALIDATION_ERROR`, `DIARY_NOT_FOUND`, `DIARY_ALREADY_EXISTS`, `FORBIDDEN`, `EXTERNAL_API_ERROR`, `RECOMMENDATION_EMPTY`.
+`VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `UNSUPPORTED_PROVIDER`, `INVALID_SOCIAL_TOKEN`, `INVALID_REFRESH_TOKEN`, `USER_NOT_FOUND`, `DIARY_NOT_FOUND`, `DIARY_ALREADY_EXISTS`, `FUTURE_DATE_NOT_ALLOWED`, `DATA_CONFLICT`, `RATE_LIMIT_EXCEEDED`, `EXTERNAL_API_ERROR`, `EXTERNAL_API_TIMEOUT`, `EXTERNAL_API_UNAVAILABLE`, `INTERNAL_ERROR`.
+
+> `DATA_CONFLICT`(409)는 일기 중복 외의 DB 제약 충돌입니다. 대개 같은 요청이 동시에 두 번
+> 들어온 경우이므로, 클라이언트는 한 번 재시도하면 됩니다.
 
 ### 0.4 고정값(enum)
 
@@ -70,16 +73,32 @@ Spring Boot 백엔드(`musing_BE`)용 REST API 명세. 프론트(Flutter) 핸드
 ### 1.1 소셜 로그인
 `POST /api/v1/auth/login`  · 인증 불필요
 
-프론트가 소셜 SDK로 받은 토큰을 서버에 전달 → 서버가 검증 후 자체 JWT 발급.
+프론트가 소셜 SDK로 받은 자격증명을 서버에 전달 → 서버가 검증 후 자체 JWT 발급.
 
 **Request**
 ```jsonc
 {
   "provider": "kakao",        // kakao | naver | google | apple
-  "idToken": "<소셜 id_token 또는 access_token>",
+  "idToken": "<제공자별 자격증명>",
+  "state": "<네이버 전용>",     // 네이버만 필수, 그 외 제공자는 생략
   "nickname": "예성"           // 최초 가입 시 선택(없으면 소셜 프로필 사용)
 }
 ```
+
+**⚠️ `idToken`에 넣을 값은 제공자마다 다릅니다.**
+
+| provider | `idToken`에 넣을 값 | `state` | 서버가 검증하는 것 |
+|---|---|---|---|
+| `google` | id_token | 불필요 | 토큰 서명 + `aud` = 우리 client id |
+| `apple` | id_token | 불필요 | 토큰 서명 + `aud` = 우리 client id |
+| `kakao` | access_token | 불필요 | access_token_info의 `app_id` = 우리 앱 id |
+| `naver` | **인가 코드(authorization code)** | **필수** | 우리 client_id/secret으로 코드를 직접 교환 |
+
+> **네이버가 access_token이 아니라 인가 코드인 이유:** 네이버에는 "이 토큰이 우리 앱에 발급된
+> 것인가"를 확인해 주는 API가 없습니다. 액세스 토큰을 그대로 받으면 제3자가 자기 앱으로 모은
+> 토큰을 우리 로그인에 던져 남의 계정이 될 수 있습니다(토큰 치환). 인가 코드를 받아 서버가
+> client_secret으로 직접 교환하면, 교환에 성공했다는 사실 자체가 우리 앱 발급 증거가 됩니다.
+> 프론트는 네이버 로그인 콜백에서 받은 `code`와 `state`를 그대로 보내면 됩니다.
 
 **Response 200**
 ```jsonc
@@ -99,6 +118,10 @@ Spring Boot 백엔드(`musing_BE`)용 REST API 명세. 프론트(Flutter) 핸드
 ### 1.2 토큰 재발급
 `POST /api/v1/auth/refresh`  · 인증 불필요
 
+리프레시 토큰은 **1회용**입니다. 재발급할 때마다 회전하며, 쓴 토큰을 다시 보내면
+`INVALID_REFRESH_TOKEN`(401)입니다. 또 한 사용자당 활성 세션은 **최대 5개**로,
+6번째 로그인부터 가장 오래된 세션이 밀려나 로그아웃됩니다.
+
 ```jsonc
 // Request
 { "refreshToken": "eyJhbGc..." }
@@ -115,6 +138,12 @@ Spring Boot 백엔드(`musing_BE`)용 REST API 명세. 프론트(Flutter) 핸드
 
 ### 1.4 로그아웃
 `POST /api/v1/auth/logout`  · 인증 필요 — refreshToken 무효화. **204**.
+
+```jsonc
+// Request (바디 전체가 선택)
+{ "refreshToken": "eyJhbGc..." }   // 주면 이 기기만 로그아웃
+// 바디를 생략하면 이 사용자의 모든 기기에서 로그아웃
+```
 
 ### 1.5 회원 탈퇴 (계정 삭제)
 `DELETE /api/v1/auth/withdraw`  · 인증 필요 — 사용자 계정과 **모든 개인 데이터**(일기·곡 연결·리프레시 토큰)를 삭제. FK `ON DELETE CASCADE`로 하위 일괄 정리. **204**.

@@ -7,14 +7,16 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
-    defer-datasource-initialization: true
+    defer-datasource-initialization: false
     properties:
       hibernate:
         format_sql: true
     show-sql: true
   sql:
+    # 시드 사용자(provider=local)는 소셜 로그인 도입으로 접근 경로가 사라져 제거했다.
+    # 스키마는 Flyway가 전담한다.
     init:
-      mode: always
+      mode: never
 
 app:
   cors:
@@ -25,6 +27,9 @@ app:
     refresh-token-seconds: ${APP_REFRESH_TOKEN_SECONDS:1209600}
     google-client-id: ${GOOGLE_CLIENT_ID:local-google-client-id}
     apple-client-id: ${APPLE_CLIENT_ID:local-apple-client-id}
+    kakao-app-id: ${KAKAO_APP_ID:local-kakao-app-id}
+    naver-client-id: ${NAVER_CLIENT_ID:local-naver-client-id}
+    naver-client-secret: ${NAVER_CLIENT_SECRET:local-naver-client-secret}
 
 musing:
   track-search:

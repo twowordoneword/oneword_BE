@@ -29,10 +29,11 @@ public class AuthController {
         return ApiResponse.ok(authService.me());
     }
 
+    /** 바디에 refreshToken을 주면 그 기기만, 생략하면 모든 기기에서 로그아웃한다. */
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void logout() {
-        authService.logout();
+    public void logout(@RequestBody(required = false) LogoutRequest request) {
+        authService.logout(request);
     }
 
     @DeleteMapping("/withdraw")
