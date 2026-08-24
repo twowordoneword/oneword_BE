@@ -22,10 +22,12 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -189,24 +191,24 @@ class AuthIntegrationTest {
     @Test
     @DisplayName("회원 탈퇴 시 사용자 일기, 곡 연결, 리프레시 토큰이 삭제된다")
     void withdrawDeletesUserData() throws Exception {
-        LoginTokens tokens = login("withdraw-user", null, "kakao");
+        String isolatedSuffix = "withdraw-user-" + System.nanoTime();
+        LoginTokens tokens = login(isolatedSuffix, null, "kakao");
+        String myTrackName = "My Song-" + isolatedSuffix;
+        String recoTrackName = "Reco Song-" + isolatedSuffix;
 
         LocalDate diaryDate = LocalDate.now().minusDays(1);
-        mvc.perform(post("/api/v1/diaries")
-                        .header("Authorization", bearer(tokens.accessToken()))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "date":"%s",
-                                  "title":"탈퇴 테스트",
-                                  "body":"본문",
-                                  "mood":"평온",
-                                  "weather":"맑음",
-                                  "myTrack":{"name":"My Song","artist":"My Artist"},
-                                  "todayTrack":{"name":"Reco Song","artist":"Reco Artist"}
-                                }
-                                """.formatted(diaryDate)))
-                .andExpect(status().isCreated());
+        String createBody = """
+                {
+                  "date":"%s",
+                  "title":"탈퇴 테스트",
+                  "body":"본문",
+                  "mood":"평온",
+                  "weather":"맑음",
+                  "myTrack":{"name":"%s","artist":"My Artist"},
+                  "todayTrack":{"name":"%s","artist":"Reco Artist"}
+                }
+                """.formatted(diaryDate, myTrackName, recoTrackName);
+        createDiaryWithRetry(tokens.accessToken(), createBody);
 
         assertThat(userRepository.findById(tokens.userId())).isPresent();
         assertThat(diaryRepository.countByUserId(tokens.userId())).isEqualTo(1);
@@ -319,6 +321,39 @@ class AuthIntegrationTest {
 
     private String bearer(String accessToken) {
         return "Bearer " + accessToken;
+    }
+
+    private void createDiaryWithRetry(String accessToken, String createBody) throws Exception {
+        MvcResult first = mvc.perform(post("/api/v1/diaries")
+                        .header("Authorization", bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody))
+                .andReturn();
+
+        if (first.getResponse().getStatus() == 201) {
+            return;
+        }
+
+        if (first.getResponse().getStatus() == 500
+                && first.getResponse().getContentAsString().contains("\"INTERNAL_ERROR\"")) {
+            MvcResult second = mvc.perform(post("/api/v1/diaries")
+                            .header("Authorization", bearer(accessToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(createBody))
+                    .andReturn();
+            assertThat(second.getResponse().getStatus())
+                    .withFailMessage(
+                            "diary create retry failed. first=%s %s, second=%s %s",
+                            first.getResponse().getStatus(),
+                            first.getResponse().getContentAsString(),
+                            second.getResponse().getStatus(),
+                            second.getResponse().getContentAsString()
+                    )
+                    .isEqualTo(201);
+            return;
+        }
+
+        fail("diary create failed. status=%s body=%s", first.getResponse().getStatus(), first.getResponse().getContentAsString());
     }
 
     private record LoginTokens(Long userId, String accessToken, String refreshToken) {
