@@ -9,6 +9,7 @@ import com.example.musing_BE.common.exception.ErrorCode;
 import com.example.musing_BE.common.http.RestClients;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -20,6 +21,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -57,8 +59,19 @@ public class SocialTokenVerifierImpl implements SocialTokenVerifier {
         this.restClient = RestClients.createDefault();
     }
 
+    /**
+     * 설정되지 않은 제공자는 여기서 끊는다.
+     *
+     * <p>키가 제공자별로 순차적으로 들어오는 동안(애플은 유료 프로그램 가입 전, 네이버는 검수 전)
+     * 하나가 비었다고 서버 전체가 못 뜨면 나머지 로그인까지 막힌다. 대신 <b>비어 있는 제공자는
+     * 로그인이 거부된다</b> — 검증값 없이 통과시키는 일은 없으므로 안전성은 그대로다.
+     */
     @Override
     public SocialUserInfo verify(SocialLoginCommand command) {
+        if (!isConfigured(command.provider())) {
+            log.warn("설정되지 않은 제공자로 로그인 시도: {}", command.provider());
+            throw new BusinessException(ErrorCode.UNSUPPORTED_PROVIDER);
+        }
         return switch (command.provider()) {
             case KAKAO -> verifyKakao(command.credential());
             case NAVER -> verifyNaver(command.credential(), command.state());
@@ -75,8 +88,9 @@ public class SocialTokenVerifierImpl implements SocialTokenVerifier {
      * id_token 검증으로 바꾸면 서명과 {@code aud}만으로 앱 바인딩이 증명되므로 추가 호출도 사라진다.
      */
     private SocialUserInfo verifyKakao(String idToken) {
+        List<String> audiences = requireConfigured(authProperties.kakaoClientId(), "app.auth.kakao-client-id");
         Jwt jwt = decodeJwt(kakaoDecoder, idToken);
-        validateAudience(jwt, requireConfigured(authProperties.kakaoClientId(), "app.auth.kakao-client-id"));
+        validateAudience(jwt, audiences);
         return new SocialUserInfo(
                 SocialProvider.KAKAO,
                 jwt.getSubject(),
@@ -142,8 +156,9 @@ public class SocialTokenVerifierImpl implements SocialTokenVerifier {
     }
 
     private SocialUserInfo verifyGoogle(String idToken) {
+        List<String> audiences = requireConfigured(authProperties.googleClientId(), "app.auth.google-client-id");
         Jwt jwt = decodeJwt(googleDecoder, idToken);
-        validateAudience(jwt, requireConfigured(authProperties.googleClientId(), "app.auth.google-client-id"));
+        validateAudience(jwt, audiences);
         return new SocialUserInfo(
                 SocialProvider.GOOGLE,
                 jwt.getSubject(),
@@ -153,8 +168,9 @@ public class SocialTokenVerifierImpl implements SocialTokenVerifier {
     }
 
     private SocialUserInfo verifyApple(String idToken) {
+        List<String> audiences = requireConfigured(authProperties.appleClientId(), "app.auth.apple-client-id");
         Jwt jwt = decodeJwt(appleDecoder, idToken);
-        validateAudience(jwt, requireConfigured(authProperties.appleClientId(), "app.auth.apple-client-id"));
+        validateAudience(jwt, audiences);
         return new SocialUserInfo(SocialProvider.APPLE, jwt.getSubject(), jwt.getClaimAsString("email"), null);
     }
 
@@ -176,23 +192,60 @@ public class SocialTokenVerifierImpl implements SocialTokenVerifier {
         }
     }
 
-    /** 설정 누락은 사용자 잘못이 아니라 배포 실수다. 조용히 통과시키지 않고 500으로 드러낸다. */
+    public boolean isConfigured(SocialProvider provider) {
+        return switch (provider) {
+            case KAKAO -> hasValue(authProperties.kakaoClientId());
+            case GOOGLE -> hasValue(authProperties.googleClientId());
+            case APPLE -> hasValue(authProperties.appleClientId());
+            // 네이버는 인가 코드를 직접 교환하므로 secret까지 있어야 한다
+            case NAVER -> hasValue(authProperties.naverClientId()) && hasValue(authProperties.naverClientSecret());
+        };
+    }
+
+    /**
+     * 어떤 제공자가 켜져 있는지 기동 시 남긴다.
+     *
+     * <p>미설정 제공자를 400으로 거절하다 보면 <b>설정을 깜빡한 것</b>과 <b>일부러 끈 것</b>이
+     * 구분되지 않는다. 기동 로그에 찍어 두면 배포 직후 바로 눈에 띈다.
+     */
+    @PostConstruct
+    void logConfiguredProviders() {
+        List<SocialProvider> enabled = Arrays.stream(SocialProvider.values()).filter(this::isConfigured).toList();
+        List<SocialProvider> disabled = Arrays.stream(SocialProvider.values()).filter(p -> !isConfigured(p)).toList();
+        log.info("소셜 로그인 활성: {}", enabled.isEmpty() ? "없음" : enabled);
+        if (!disabled.isEmpty()) {
+            log.warn("소셜 로그인 비활성(설정 없음): {} — 의도한 것이 아니면 환경변수를 확인할 것", disabled);
+        }
+    }
+
+    private boolean hasValue(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private boolean hasValue(List<String> values) {
+        return values != null && values.stream().anyMatch(this::hasValue);
+    }
+
+    /**
+     * {@link #verify}에서 이미 설정 여부를 걸렀으므로 여기 도달하면 값이 있다.
+     * 남겨 두는 것은 호출 순서가 바뀌었을 때를 대비한 안전장치다.
+     */
     private String requireConfigured(String value, String propertyName) {
-        if (value == null || value.isBlank()) {
+        if (!hasValue(value)) {
             log.error("필수 설정이 비어 있습니다: {}", propertyName);
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+            throw new BusinessException(ErrorCode.UNSUPPORTED_PROVIDER);
         }
         return value.trim();
     }
 
     private List<String> requireConfigured(List<String> values, String propertyName) {
         List<String> configured = values == null ? List.of() : values.stream()
-                .filter(value -> value != null && !value.isBlank())
+                .filter(this::hasValue)
                 .map(String::trim)
                 .toList();
         if (configured.isEmpty()) {
             log.error("필수 설정이 비어 있습니다: {}", propertyName);
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+            throw new BusinessException(ErrorCode.UNSUPPORTED_PROVIDER);
         }
         return configured;
     }

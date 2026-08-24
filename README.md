@@ -45,6 +45,18 @@ NAVER_CLIENT_SECRET=... \
 | `GOOGLE_CLIENT_ID` / `APPLE_CLIENT_ID` / `KAKAO_CLIENT_ID` | id_token의 `aud` 검증값. **콤마로 여러 개 등록 가능** |
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | 네이버 인가 코드 교환용 |
 
+> **비워 두면 그 제공자만 비활성화됩니다.** 서버는 정상 기동하고, 해당 제공자로 로그인하면
+> `UNSUPPORTED_PROVIDER`(400)를 돌려줍니다. 키가 하나씩 들어오는 동안(애플은 유료 프로그램
+> 가입 전, 네이버는 검수 전) 나머지 로그인이 막히지 않게 하기 위한 것입니다. 검증값 없이
+> 통과시키는 일은 없으므로 안전성은 그대로입니다.
+>
+> 어떤 제공자가 켜져 있는지는 **기동 로그**에 찍힙니다 — 설정을 깜빡한 경우 바로 눈에 띕니다.
+>
+> ```
+> 소셜 로그인 활성: [KAKAO, GOOGLE]
+> 소셜 로그인 비활성(설정 없음): [NAVER, APPLE] — 의도한 것이 아니면 환경변수를 확인할 것
+> ```
+>
 > 플랫폼마다 client id가 달라 `aud`도 달라집니다. 애플은 iOS 네이티브 로그인이면 앱의
 > **Bundle ID**, 웹·안드로이드면 **Services ID**입니다. 카카오는 SDK 초기화에 쓴
 > **네이티브 앱 키**가 `aud`가 되고, 구글은 `serverClientId`를 지정해도 플랫폼에 따라
