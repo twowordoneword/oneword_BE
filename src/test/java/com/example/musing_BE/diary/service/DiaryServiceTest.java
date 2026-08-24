@@ -5,9 +5,13 @@ import com.example.musing_BE.common.exception.ErrorCode;
 import com.example.musing_BE.diary.domain.Mood;
 import com.example.musing_BE.diary.domain.Weather;
 import com.example.musing_BE.diary.dto.DiaryUpsertRequest;
+import com.example.musing_BE.diary.dto.TrackDto;
+import com.example.musing_BE.user.entity.User;
 import com.example.musing_BE.diary.repository.DiaryRepository;
 import com.example.musing_BE.security.CurrentUserProvider;
+import com.example.musing_BE.track.entity.Track;
 import com.example.musing_BE.track.repository.TrackRepository;
+import com.example.musing_BE.track.service.TrackResolver;
 import com.example.musing_BE.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -25,6 +30,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DiaryService 비즈니스 로직 테스트")
@@ -34,6 +41,7 @@ class DiaryServiceTest {
     @Mock TrackRepository trackRepository;
     @Mock UserRepository userRepository;
     @Mock CurrentUserProvider currentUserProvider;
+    @Mock TrackResolver trackResolver;
     @InjectMocks DiaryService diaryService;
 
     private final LocalDate TODAY = LocalDate.now(ZoneId.of("Asia/Seoul"));
@@ -41,6 +49,32 @@ class DiaryServiceTest {
 
     private DiaryUpsertRequest req(LocalDate date) {
         return new DiaryUpsertRequest(date, "제목", "본문", Mood.JOY, Weather.SUNNY, null, null);
+    }
+
+    /**
+     * 서로 다른 사용자가 같은 곡을 동시에 처음 저장하면 조회-저장 사이에서 유니크 제약에 걸린다.
+     * 그때 요청이 실패로 끝나면 안 되고, 이미 만들어진 행을 재조회해 이어가야 한다.
+     */
+    @Test
+    @DisplayName("곡 저장이 유니크 충돌로 실패하면 새 트랜잭션에서 재조회해 이어간다")
+    void 곡_동시저장_충돌시_재시도() {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(diaryRepository.existsByUserIdAndDiaryDate(anyLong(), any())).willReturn(false);
+        given(userRepository.findById(1L)).willReturn(Optional.of(
+                User.create("a@musing.app", "nick", "kakao", "pid")));
+        given(trackResolver.resolveId(any(TrackDto.class)))
+                .willThrow(new DataIntegrityViolationException("uq_tracks_name_artist"))
+                .willReturn(42L);
+        given(trackRepository.getReferenceById(42L)).willReturn(Track.builder()
+                .name("밤편지").artist("아이유").build());
+        given(diaryRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
+
+        DiaryUpsertRequest request = new DiaryUpsertRequest(
+                PAST, "제목", "본문", Mood.JOY, Weather.SUNNY,
+                new TrackDto(null, "밤편지", "아이유", null, null, null), null);
+
+        assertThat(diaryService.create(request)).isNotNull();
+        verify(trackResolver, times(2)).resolveId(any(TrackDto.class));
     }
 
     @Test

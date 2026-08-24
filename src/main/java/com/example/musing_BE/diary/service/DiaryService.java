@@ -11,10 +11,12 @@ import com.example.musing_BE.diary.entity.Diary;
 import com.example.musing_BE.diary.repository.DiaryRepository;
 import com.example.musing_BE.track.entity.Track;
 import com.example.musing_BE.track.repository.TrackRepository;
+import com.example.musing_BE.track.service.TrackResolver;
 import com.example.musing_BE.security.CurrentUserProvider;
 import com.example.musing_BE.user.entity.User;
 import com.example.musing_BE.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
@@ -29,6 +31,7 @@ public class DiaryService {
 
     private final DiaryRepository diaryRepository;
     private final TrackRepository trackRepository;
+    private final TrackResolver trackResolver;
     private final UserRepository userRepository;
     private final CurrentUserProvider currentUserProvider;
 
@@ -118,13 +121,20 @@ public class DiaryService {
         }
     }
 
-    /** 곡 마스터 upsert: 이미 있으면 메타(앨범/커버/미리듣기) 갱신 후 재사용, 없으면 신규 저장. */
+    /**
+     * 곡 마스터 upsert: 이미 있으면 메타(앨범/커버/미리듣기) 갱신 후 재사용, 없으면 신규 저장.
+     *
+     * <p>서로 다른 사용자가 같은 곡을 동시에 처음 저장하면 조회-저장 사이에서
+     * {@code uq_tracks_name_artist}에 걸린다. 그때는 이미 다른 트랜잭션이 행을 만들어 뒀으므로
+     * 새 트랜잭션에서 한 번 더 조회하면 성공한다. 두 번째도 실패하면 진짜 충돌이라 그대로 올려보낸다.
+     */
     private Track upsertTrack(TrackDto dto) {
-        return trackRepository.findByNameAndArtist(dto.name(), dto.artist())
-                .map(existing -> {
-                    existing.updateMeta(dto.album(), dto.artworkUrl(), dto.previewUrl());
-                    return existing;
-                })
-                .orElseGet(() -> trackRepository.save(dto.toNewEntity()));
+        Long trackId;
+        try {
+            trackId = trackResolver.resolveId(dto);
+        } catch (DataIntegrityViolationException e) {
+            trackId = trackResolver.resolveId(dto);
+        }
+        return trackRepository.getReferenceById(trackId);
     }
 }

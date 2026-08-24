@@ -2,6 +2,7 @@ package com.example.musing_BE.common.exception;
 
 import com.example.musing_BE.common.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import java.time.format.DateTimeParseException;
@@ -39,14 +41,34 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 파라미터 검증 실패(@RequestParam·@PathVariable의 @NotBlank·@Size 등) → 400.
+     *
+     * <p>Spring은 이 예외를 이미 400 의도로 던지지만, 아래 catch-all {@code Exception} 핸들러가
+     * 더 넓게 잡아 500으로 바꿔 버린다. 명시적으로 처리해야 의도한 상태 코드가 나간다.
+     */
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleParameterValidation(HandlerMethodValidationException e) {
+        String msg = e.getParameterValidationResults().stream()
+                .findFirst()
+                .flatMap(result -> result.getResolvableErrors().stream()
+                        .findFirst()
+                        .map(error -> result.getMethodParameter().getParameterName()
+                                + ": " + error.getDefaultMessage()))
+                .orElse(ErrorCode.VALIDATION_ERROR.getMessage());
+        return badRequest(msg);
+    }
+
+    /**
      * 잘못된 요청 값 → 400.
      * - DateTimeParseException: month=YYYY-MM 형식 오류
      * - HttpMessageNotReadableException: JSON/enum(mood·weather) 파싱 실패
      * - MethodArgumentTypeMismatchException: 경로변수 날짜 형식 오류
      * - MissingServletRequestParameterException: 필수 파라미터(month) 누락
+     * - ConstraintViolationException: 서비스 계층 @Validated 검증 실패
      * - IllegalArgumentException: enum 변환 실패 등
      */
     @ExceptionHandler({
+            ConstraintViolationException.class,
             DateTimeParseException.class,
             HttpMessageNotReadableException.class,
             MethodArgumentTypeMismatchException.class,

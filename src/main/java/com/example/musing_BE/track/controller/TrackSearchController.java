@@ -5,6 +5,8 @@ import com.example.musing_BE.security.CurrentUserProvider;
 import com.example.musing_BE.track.dto.TrackSearchResponse;
 import com.example.musing_BE.track.service.TrackSearchRateLimiter;
 import com.example.musing_BE.track.service.TrackSearchService;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,7 +25,7 @@ public class TrackSearchController {
     /** 4.1 곡 검색 (iTunes 프록시) */
     @GetMapping("/search")
     public ApiResponse<TrackSearchResponse> search(
-            @RequestParam String q,
+            @RequestParam @NotBlank @Size(max = 100) String q,
             @RequestParam(defaultValue = "20") int limit) {
         Long userId = currentUserProvider.getCurrentUserId();
         trackSearchRateLimiter.checkOrThrow(userId);
