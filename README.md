@@ -5,8 +5,13 @@ Spring Boot 기반 뮤징 백엔드입니다.
 ## 빠른 시작
 ```bash
 docker compose up -d
-SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
+cp .env.example .env          # 최초 1회, 값 채우기
+set -a; source .env; set +a   # 환경변수 주입
+./gradlew bootRun
 ```
+
+`.env`는 `.gitignore` 대상입니다. 환경변수를 주입하지 않고 실행하면
+`app.auth.access-token-seconds` 바인딩 실패로 기동되지 않습니다.
 
 ## 프로파일
 - 기본값(프로파일 미지정): 운영 안전 설정(`ddl-auto=validate`, `sql.init.mode=never`)
@@ -41,11 +46,13 @@ NAVER_CLIENT_SECRET=... \
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | 네이버 인가 코드 교환용 |
 
 > 플랫폼마다 client id가 달라 `aud`도 달라집니다. 애플은 iOS 네이티브 로그인이면 앱의
-> **Bundle ID**, 웹·안드로이드면 **Services ID**이고, 구글은 Flutter에서 `serverClientId`를
-> 지정하면 **웹 클라이언트 ID**가 `aud`가 됩니다. 여러 플랫폼을 지원하면 콤마로 나열하세요.
+> **Bundle ID**, 웹·안드로이드면 **Services ID**입니다. 카카오는 SDK 초기화에 쓴
+> **네이티브 앱 키**가 `aud`가 되고, 구글은 `serverClientId`를 지정해도 플랫폼에 따라
+> **웹 클라이언트 ID** 또는 **iOS 클라이언트 ID**가 `aud`로 올 수 있으니 둘 다 등록하세요.
 >
 > ```
 > APPLE_CLIENT_ID=com.musing.app,com.musing.web
+> GOOGLE_CLIENT_ID=<웹 클라이언트 ID>,<iOS 클라이언트 ID>
 > ```
 >
 > 뒤 세 줄은 **"우리 앱에 발급된 소셜 자격증명인가"를 확인하는 값**입니다. 비워 두면 해당
