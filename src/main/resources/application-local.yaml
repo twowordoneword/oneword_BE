@@ -22,14 +22,15 @@ app:
   cors:
     allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:*}
   auth:
+    # 소셜 값이 비어 있으면 그 제공자만 비활성(로그인 시 UNSUPPORTED_PROVIDER)이고 서버는 정상 기동한다.
     jwt-secret: ${APP_JWT_SECRET:local-dev-jwt-secret-change-this-at-least-32-bytes}
     access-token-seconds: ${APP_ACCESS_TOKEN_SECONDS:3600}
     refresh-token-seconds: ${APP_REFRESH_TOKEN_SECONDS:1209600}
-    google-client-id: ${GOOGLE_CLIENT_ID:local-google-client-id}
-    apple-client-id: ${APPLE_CLIENT_ID:local-apple-client-id}
-    kakao-client-id: ${KAKAO_CLIENT_ID:local-kakao-client-id}
-    naver-client-id: ${NAVER_CLIENT_ID:local-naver-client-id}
-    naver-client-secret: ${NAVER_CLIENT_SECRET:local-naver-client-secret}
+    google-client-id: ${GOOGLE_CLIENT_ID:}
+    apple-client-id: ${APPLE_CLIENT_ID:}
+    kakao-client-id: ${KAKAO_CLIENT_ID:}
+    naver-client-id: ${NAVER_CLIENT_ID:}
+    naver-client-secret: ${NAVER_CLIENT_SECRET:}
 
 musing:
   track-search:

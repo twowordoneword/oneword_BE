@@ -96,6 +96,10 @@ Spring Boot 백엔드(`musing_BE`)용 REST API 명세. 프론트(Flutter) 핸드
 | `kakao` | id_token (OIDC) | 불필요 | 토큰 서명 + `aud` = 우리 앱 키 |
 | `naver` | **인가 코드(authorization code)** | **필수** | 우리 client_id/secret으로 코드를 직접 교환 |
 
+> **서버에 키가 설정되지 않은 제공자로 로그인하면 `UNSUPPORTED_PROVIDER`(400)가 나갑니다.**
+> 제공자를 순차적으로 붙이는 중이라 그렇습니다. 프론트는 이 코드를 "해당 로그인 수단 사용 불가"로
+> 처리하면 됩니다.
+
 > **카카오는 OIDC id_token입니다** — access_token이 아닙니다. Flutter SDK의 `OAuthToken.idToken`을
 > 그대로 보내면 됩니다. 이걸 쓰려면 Kakao Developers 콘솔에서 **OpenID Connect 활성화**가 필요합니다.
 
