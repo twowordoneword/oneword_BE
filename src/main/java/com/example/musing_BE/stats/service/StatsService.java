@@ -1,8 +1,8 @@
 package com.example.musing_BE.stats.service;
 
-import com.example.musing_BE.diary.domain.TrackRole;
 import com.example.musing_BE.diary.domain.Mood;
 import com.example.musing_BE.diary.repository.DiaryRepository;
+import com.example.musing_BE.diary.repository.DiaryTrackRepository;
 import com.example.musing_BE.security.CurrentUserProvider;
 import com.example.musing_BE.stats.dto.StatsResponse;
 import lombok.RequiredArgsConstructor;
@@ -19,13 +19,16 @@ import java.util.List;
 public class StatsService {
 
     private final DiaryRepository diaryRepository;
+    private final DiaryTrackRepository diaryTrackRepository;
     private final CurrentUserProvider currentUserProvider;
     private final Clock kstClock;
 
     public StatsResponse getStats() {
         Long userId = currentUserProvider.getCurrentUserId();
         long totalDiaries = diaryRepository.countByUserId(userId);
-        long totalMusic = diaryRepository.countDiariesWithRole(userId, TrackRole.MY);
+        // 아카이브에 보이는 개수와 같아야 한다. 추천곡도 그날 기록의 일부로 함께 보여주므로
+        // MY만 세면 서랍의 숫자와 아카이브 목록이 어긋난다.
+        long totalMusic = diaryTrackRepository.countByDiaryUserId(userId);
 
         LocalDate today = LocalDate.now(kstClock);
         boolean todayWritten = diaryRepository.existsByUserIdAndDiaryDate(userId, today);

@@ -237,6 +237,40 @@ Spring Boot 백엔드(`musing_BE`)용 REST API 명세. 프론트(Flutter) 핸드
 ### 2.5 일기 삭제
 `DELETE /api/v1/diaries/{date}`  · 인증 필요 — **204**. 연결된 `diary_track`도 함께 삭제.
 
+
+### 2.6 음악 아카이브
+`GET /api/v1/diaries/tracks?cursor={커서}&limit=20`  · 인증 필요
+
+기록에 담긴 곡을 **최신순**으로 모아 봅니다. 월별 조회(2.1)는 커버 URL만 주기 때문에,
+이걸로 만들지 않으면 날짜마다 상세(2.2)를 따로 불러야 해서 1년치면 요청이 수백 개가 됩니다.
+
+| 파라미터 | 제약 |
+|---|---|
+| `cursor` | 선택. 이전 응답의 `nextCursor`를 그대로 넘긴다. 없으면 첫 페이지 |
+| `limit` | 선택(기본 20). **1~100** — 벗어나면 `VALIDATION_ERROR`(400) |
+
+**Response 200**
+```jsonc
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "date": "2026-08-03",
+        "name": "밤편지", "artist": "아이유", "album": "밤편지",
+        "artworkUrl": "https://...", "previewUrl": "https://...",
+        "role": "MY",              // MY | RECOMMENDED
+        "mood": "평온"              // 그날 일기의 기분
+      }
+    ],
+    "nextCursor": "2026-08-03:41"  // 마지막 페이지면 null
+  }
+}
+```
+
+- 일기 하나에 `MY`와 `RECOMMENDED`가 모두 있으면 **같은 날짜가 두 번** 나옵니다.
+- `nextCursor`는 `yyyy-MM-dd:id` 형식이지만 **해석하지 말고 받은 그대로** 넘기세요. 형식이 깨지면 `VALIDATION_ERROR`(400)입니다.
+- 커서에 날짜뿐 아니라 id가 함께 들어가는 이유는, 같은 날짜에 곡이 둘일 때 페이지 경계가 그 사이를 지나면 곡이 누락되거나 중복되기 때문입니다.
 ---
 
 ## 3. 추천 (Recommendation)
@@ -312,7 +346,7 @@ Spring Boot 백엔드(`musing_BE`)용 REST API 명세. 프론트(Flutter) 핸드
   "success": true,
   "data": {
     "totalDiaries": 10,       // 전체 일기 수
-    "totalMusic": 8,          // 음악 등록된 일기 수
+    "totalMusic": 14,         // 기록에 담긴 곡 수 (MY + RECOMMENDED)
     "currentStreak": 3,       // 연속 작성 일수
     "todayWritten": false,    // 오늘 일기 작성 여부
     "topMood": "평온"          // 최다 기분(선택)
@@ -321,6 +355,8 @@ Spring Boot 백엔드(`musing_BE`)용 REST API 명세. 프론트(Flutter) 핸드
 ```
 
 정책:
+- `totalMusic`은 **아카이브(2.6)에 보이는 개수와 같다.** 추천곡도 그날 기록의 일부로 함께 세므로
+  `MY`만 세지 않는다. 일기 수가 아니라 **곡 연결 수**라서, 한 일기에 곡이 둘이면 2로 센다.
 - 집계 범위는 **전체 기간**(all-time)이며 `month` 쿼리 파라미터는 받지 않는다.
 - `todayWritten` 및 `currentStreak`의 날짜 기준은 **KST(Asia/Seoul)** 이다.
 - `currentStreak`는 최신 작성일이 오늘 또는 어제일 때만 시작되며, 월 경계를 넘어도 날짜가 연속이면 이어서 계산한다.
