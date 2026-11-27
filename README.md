@@ -36,6 +36,22 @@ NAVER_CLIENT_SECRET=... \
 
 운영 환경에서는 Flyway 마이그레이션 적용 후 `ddl-auto=validate`로 동작합니다.
 
+### 운영 설정 점검 (기동 시 자동)
+`local`·`test`가 아닌 프로필(프로필 미지정 포함)로 띄우면 `ProductionConfigGuard`가 아래를 확인하고,
+하나라도 어기면 **서버가 기동되지 않습니다.**
+
+| 항목 | 조건 |
+|---|---|
+| `APP_JWT_SECRET` | 32바이트 이상, 저장소에 공개된 개발·테스트용 값 금지 |
+| `APP_ACCESS_TOKEN_SECONDS` | 1~3600 (권장 1800 — 로그아웃·탈퇴 후에도 만료까지 유효하므로 짧게) |
+| `CORS_ALLOWED_ORIGIN_PATTERNS` | 비어 있으면 안 됨, `*`·`https://*` 같은 전체 허용 금지 (`https://*.your-app.com`은 허용) |
+| `ADMIN_TOKEN` | 설정한다면 32자 이상 (비워 두면 관리자 API가 항상 거부됨) |
+
+시크릿 생성 예시:
+```bash
+openssl rand -base64 48
+```
+
 ### 인증 환경변수
 | 변수 | 설명 |
 |---|---|

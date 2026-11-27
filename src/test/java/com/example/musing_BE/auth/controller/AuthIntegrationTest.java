@@ -121,6 +121,30 @@ class AuthIntegrationTest {
     }
 
     @Test
+    @DisplayName("요청 닉네임이 50자를 넘으면 400을 반환한다")
+    void loginRejectsTooLongNickname() throws Exception {
+        mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"provider":"kakao","idToken":"token-long-nick","nickname":"%s"}
+                                """.formatted("가".repeat(51))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("소셜 프로필 이름이 50자를 넘으면 잘라서 가입시킨다")
+    void socialNicknameIsTruncated() throws Exception {
+        // 목 검증기는 "social-" + providerId를 닉네임으로 돌려준다 → 7 + 60 = 67자
+        LoginTokens tokens = login("x".repeat(60), null, "kakao");
+
+        mvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", bearer(tokens.accessToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.nickname").value(("social-" + "x".repeat(60)).substring(0, 50)));
+    }
+
+    @Test
     @DisplayName("유효하지 않은 소셜 토큰이면 로그인에 실패한다")
     void loginFailsWithInvalidSocialToken() throws Exception {
         mvc.perform(post("/api/v1/auth/login")
