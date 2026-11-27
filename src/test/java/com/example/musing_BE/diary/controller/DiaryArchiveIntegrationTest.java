@@ -118,6 +118,26 @@ class DiaryArchiveIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
     }
 
+    /**
+     * 회귀 테스트. 곡 마스터에 없던 곡은 TrackResolver가 별도 트랜잭션으로 넣고 커밋하는데,
+     * REPEATABLE READ에서는 바깥 일기 트랜잭션이 그 행을 못 봐서 500이 났다.
+     * 곡 이름을 매번 새로 만들어 DB 상태와 무관하게 "처음 저장되는 곡" 경로를 탄다.
+     */
+    @Test
+    @DisplayName("처음 저장되는 곡으로 일기를 써도 201")
+    void createsDiaryWithBrandNewTrack() throws Exception {
+        String name = "새곡-" + UUID.randomUUID();
+        mvc.perform(post("/api/v1/diaries")
+                        .header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"date":"2026-08-04","title":"제목","body":"본문","mood":"평온","weather":"맑음",
+                                 "myTrack":{"name":"%s","artist":"새가수"}}
+                                """.formatted(name)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.myTrack.name").value(name));
+    }
+
     @Test
     @DisplayName("limit 범위를 벗어나면 400")
     void rejectsOutOfRangeLimit() throws Exception {

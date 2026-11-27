@@ -6,6 +6,12 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      # MySQL 기본값(REPEATABLE READ)은 트랜잭션의 첫 SELECT 시점 스냅샷을 끝까지 쓴다.
+      # 일기 저장 중 TrackResolver가 REQUIRES_NEW로 새 곡을 넣고 커밋해도, 바깥 일기 트랜잭션은
+      # 이미 잡힌 스냅샷 때문에 그 행을 못 봐서 "No row with the given identifier"로 500이 났다
+      # (처음 저장되는 곡일 때만). READ COMMITTED는 문장마다 최신 커밋을 보므로 이 문제가 없다.
+      transaction-isolation: TRANSACTION_READ_COMMITTED
   jpa:
     hibernate:
       ddl-auto: validate
