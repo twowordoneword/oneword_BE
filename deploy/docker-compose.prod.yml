@@ -1,0 +1,41 @@
+# 운영(EC2) 실행 정의. 서버의 ~/musing/ 에 deploy/ 내용이 복사되고, 같은 폴더의 .env를 읽는다.
+#   docker compose -f docker-compose.prod.yml up -d
+# DB는 RDS를 쓰므로 여기서 띄우지 않는다(DB_URL로 접속).
+services:
+  app:
+    # 배포 워크플로가 커밋 SHA 태그로 덮어쓴다. 수동 실행 시엔 latest.
+    image: ${APP_IMAGE:-ghcr.io/twowordoneword/oneword_be:latest}
+    env_file: .env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+    # 호스트 밖으로는 열지 않는다. 외부 요청은 nginx만 받는다.
+    # 관리자 배치 API는 SSH 접속 후 localhost:8080 으로만 호출한다.
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      - app
+    environment:
+      # templates/*.template 안의 ${DOMAIN}만 치환된다(정의된 변수만 바꿈).
+      DOMAIN: ${DOMAIN:?DOMAIN을 .env에 설정하세요}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ./certbot-www:/var/www/certbot:ro
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
