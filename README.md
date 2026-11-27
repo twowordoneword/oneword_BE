@@ -36,6 +36,8 @@ NAVER_CLIENT_SECRET=... \
 
 운영 환경에서는 Flyway 마이그레이션 적용 후 `ddl-auto=validate`로 동작합니다.
 
+EC2 배포 절차(이미지 빌드, nginx, 자동 배포, 롤백, 스키마 점검)는 [docs/DEPLOY.md](docs/DEPLOY.md)를 참고하세요.
+
 ### 운영 설정 점검 (기동 시 자동)
 `local`·`test`가 아닌 프로필(프로필 미지정 포함)로 띄우면 `ProductionConfigGuard`가 아래를 확인하고,
 하나라도 어기면 **서버가 기동되지 않습니다.**
