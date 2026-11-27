@@ -22,6 +22,9 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class SocialUserRegistrar {
 
+    /** users.nickname 컬럼 길이. */
+    static final int NICKNAME_MAX_LENGTH = 50;
+
     private final UserRepository userRepository;
 
     @Transactional
@@ -58,10 +61,22 @@ public class SocialUserRegistrar {
         if (requestedNickname != null && !requestedNickname.isBlank()) {
             return requestedNickname;
         }
+        // 소셜 프로필 이름과 대체 닉네임은 요청 검증을 거치지 않으므로 컬럼 길이에 맞춰 자른다.
         if (socialUser.nickname() != null && !socialUser.nickname().isBlank()) {
-            return socialUser.nickname();
+            return truncate(socialUser.nickname().trim());
         }
-        return provider.code() + "_" + socialUser.providerId();
+        return truncate(provider.code() + "_" + socialUser.providerId());
+    }
+
+    private String truncate(String value) {
+        if (value.length() <= NICKNAME_MAX_LENGTH) {
+            return value;
+        }
+        // 서로게이트 쌍(이모지 등) 중간에서 자르지 않는다.
+        int end = Character.isHighSurrogate(value.charAt(NICKNAME_MAX_LENGTH - 1))
+                ? NICKNAME_MAX_LENGTH - 1
+                : NICKNAME_MAX_LENGTH;
+        return value.substring(0, end);
     }
 
     public record Result(User user, boolean isNewUser) {}
